@@ -16,7 +16,6 @@
 #include "Session.h"
 #include "ui_PrefsDialog.h"
 
-class QHttp;
 class QMessageBox;
 class QString;
 
@@ -99,13 +98,9 @@ private:
     QWidgetList web_widgets_;
     QWidgetList web_auth_widgets_;
     QWidgetList web_whitelist_widgets_;
-    QWidgetList proxy_widgets_;
-    QWidgetList proxy_auth_widgets_;
     QWidgetList sched_widgets_;
     QWidgetList block_widgets_;
     QWidgetList unsupported_when_remote_;
 
-    int blocklist_http_tag_ = {};
-    QHttp* blocklist_http_ = {};
     QMessageBox* blocklist_dialog_ = {};
 };

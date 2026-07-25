@@ -35,14 +35,7 @@ class QPixmap;
 class Prefs;
 
 struct Peer {
-    bool client_is_choked = {};
-    bool client_is_interested = {};
-    bool is_downloading_from = {};
     bool is_encrypted = {};
-    bool is_incoming = {};
-    bool is_uploading_to = {};
-    bool peer_is_choked = {};
-    bool peer_is_interested = {};
     size_t active_reqs_to_client = {};
     size_t active_reqs_to_peer = {};
     QString address;
@@ -60,16 +53,9 @@ struct Peer {
         Field<&Peer::active_reqs_to_client>{ TR_KEY_active_reqs_to_client },
         Field<&Peer::active_reqs_to_peer>{ TR_KEY_active_reqs_to_peer },
         Field<&Peer::address>{ TR_KEY_address },
-        Field<&Peer::client_is_choked>{ TR_KEY_client_is_choked },
-        Field<&Peer::client_is_interested>{ TR_KEY_client_is_interested },
         Field<&Peer::client_name>{ TR_KEY_client_name },
         Field<&Peer::flags>{ TR_KEY_flag_str },
-        Field<&Peer::is_downloading_from>{ TR_KEY_is_downloading_from },
         Field<&Peer::is_encrypted>{ TR_KEY_is_encrypted },
-        Field<&Peer::is_incoming>{ TR_KEY_is_incoming },
-        Field<&Peer::is_uploading_to>{ TR_KEY_is_uploading_to },
-        Field<&Peer::peer_is_choked>{ TR_KEY_peer_is_choked },
-        Field<&Peer::peer_is_interested>{ TR_KEY_peer_is_interested },
         Field<&Peer::port>{ TR_KEY_port },
         Field<&Peer::progress>{ TR_KEY_progress },
         Field<&Peer::rate_to_client>{ TR_KEY_rate_to_client },
@@ -87,9 +73,7 @@ struct TrackerStat {
     bool last_announce_succeeded = {};
     bool last_announce_timed_out = {};
     bool last_scrape_succeeded = {};
-    bool last_scrape_timed_out = {};
     int announce_state = {};
-    int download_count = {};
     int id = {};
     int last_announce_peer_count = {};
     int last_announce_start_time = {};
@@ -113,7 +97,6 @@ struct TrackerStat {
     static constexpr auto Fields = std::make_tuple(
         Field<&TrackerStat::announce>{ TR_KEY_announce },
         Field<&TrackerStat::announce_state>{ TR_KEY_announce_state },
-        Field<&TrackerStat::download_count>{ TR_KEY_download_count },
         Field<&TrackerStat::has_announced>{ TR_KEY_has_announced },
         Field<&TrackerStat::has_scraped>{ TR_KEY_has_scraped },
         Field<&TrackerStat::id>{ TR_KEY_id },
@@ -128,7 +111,6 @@ struct TrackerStat {
         Field<&TrackerStat::last_scrape_start_time>{ TR_KEY_last_scrape_start_time },
         Field<&TrackerStat::last_scrape_succeeded>{ TR_KEY_last_scrape_succeeded },
         Field<&TrackerStat::last_scrape_time>{ TR_KEY_last_scrape_time },
-        Field<&TrackerStat::last_scrape_timed_out>{ TR_KEY_last_scrape_timed_out },
         Field<&TrackerStat::leecher_count>{ TR_KEY_leecher_count },
         Field<&TrackerStat::next_announce_time>{ TR_KEY_next_announce_time },
         Field<&TrackerStat::next_scrape_time>{ TR_KEY_next_scrape_time },
@@ -398,11 +380,6 @@ public:
         return date_created_;
     }
 
-    [[nodiscard]] constexpr auto dateEdited() const noexcept
-    {
-        return edit_date_;
-    }
-
     [[nodiscard]] constexpr auto manualAnnounceTime() const noexcept
     {
         return manual_announce_time_;
@@ -421,11 +398,6 @@ public:
     [[nodiscard]] constexpr auto peersWeAreUploadingTo() const noexcept
     {
         return peers_getting_from_us_;
-    }
-
-    [[nodiscard]] constexpr auto isUploading() const noexcept
-    {
-        return peersWeAreUploadingTo() > 0;
     }
 
     [[nodiscard]] constexpr auto connectedPeers() const noexcept
@@ -535,11 +507,6 @@ public:
         return queue_position_;
     }
 
-    [[nodiscard]] auto constexpr isStalled() const noexcept
-    {
-        return is_stalled_;
-    }
-
     QString activityString() const;
 
     [[nodiscard]] auto constexpr getActivity() const noexcept
@@ -628,10 +595,8 @@ public:
         HAVE_UNCHECKED,
         HAVE_VERIFIED,
         HONORS_SESSION_LIMITS,
-        ICON,
         IS_FINISHED,
         IS_PRIVATE,
-        IS_STALLED,
         LABELS,
         LEFT_UNTIL_DONE,
         MANUAL_ANNOUNCE_TIME,
@@ -679,7 +644,6 @@ private:
     bool honors_session_limits_ = {};
     bool is_finished_ = {};
     bool is_private_ = {};
-    bool is_stalled_ = {};
     bool upload_limited_ = {};
 
     tr_stat::Error error_ = tr_stat::Error::Ok;
