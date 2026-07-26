@@ -788,15 +788,20 @@ jobs:
           - arch: x86
             ipo: 'OFF'
             runner: windows-2022
+            publish: true
           - arch: x64
             ipo: 'ON'
             runner: windows-2022
+            publish: true
+          # Coverage-only (newer toolchain, extra warnings). Not published: its
+          # MSI would require a VC++ redist too new for most machines.
           - arch: x64
             ipo: 'OFF'
             runner: windows-2025-vs2026
           - arch: arm64
             ipo: 'OFF'
             runner: windows-11-arm
+            publish: true
     runs-on: ${{ matrix.runner }}
     env:
       # /Z7 debug info compresses well; the default zstd level overflows the cache cap
@@ -869,14 +874,16 @@ jobs:
           choco install wixtoolset
           (Join-Path (Get-Item -Path "${Env:ProgramFiles(x86)}\WiX Toolset v3.*")[0].FullName bin) | Out-File $Env:GITHUB_PATH -Append
       - name: Package
-        if: ${{ needs.what-to-make.outputs.make-dist == 'true' || (needs.what-to-make.outputs.make-daemon == 'true' && needs.what-to-make.outputs.make-qt == 'true') }}
+        if: ${{ matrix.publish && (needs.what-to-make.outputs.make-dist == 'true' || (needs.what-to-make.outputs.make-daemon == 'true' && needs.what-to-make.outputs.make-qt == 'true')) }}
         run: |
           cmd /c "`"$Env:VCVARSALL`" $Env:VC_ARCH >nul && cmake --build obj --config RelWithDebInfo --target pack-msi"
       - uses: actions/upload-artifact@v6
+        if: ${{ matrix.publish }}
         with:
           name: binaries-${{ github.job }}-${{ matrix.arch }}-${{ matrix.runner }}
           path: pfx/**/*
       - uses: actions/upload-artifact@v6
+        if: ${{ matrix.publish }}
         with:
           name: binaries-${{ github.job }}-${{ matrix.arch }}-${{ matrix.runner }}-msi
           path: obj/dist/msi/*.msi
