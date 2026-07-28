@@ -4,11 +4,9 @@
 // License text can be found in the licenses/ folder.
 
 #include <algorithm> // std::adjacent_find, std::sort
-#include <array>
 #include <cstddef>
 #include <functional>
 #include <ranges>
-#include <utility>
 #include <vector>
 
 #include <small/vector.hpp>

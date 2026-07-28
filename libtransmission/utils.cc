@@ -8,6 +8,7 @@
 #include <cfloat> // DBL_DIG
 #include <charconv> // std::from_chars()
 #include <chrono>
+#include <concepts>
 #include <cstdint> // SIZE_MAX
 #include <cstdlib> // getenv()
 #include <ctime>
@@ -22,7 +23,6 @@
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <type_traits>
 #include <utility> // std::cmp_equal
 #include <vector>
 
@@ -41,7 +41,6 @@
 
 #include <fast_float/fast_float.h>
 
-#include "libtransmission/env.h"
 #include "libtransmission/mime-types.h"
 #include "libtransmission/string-utils.h"
 #include "libtransmission/tr-assert.h"

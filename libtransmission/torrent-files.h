@@ -8,9 +8,9 @@
 #include <algorithm> // std::sort()
 #include <cstddef>
 #include <cstdint> // uint64_t
-#include <functional>
 #include <iterator>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>

@@ -9,7 +9,6 @@
 #error only libtransmission should #include this header.
 #endif
 
-#include <array>
 #include <cstddef> // size_t
 #include <memory>
 #include <string>
@@ -24,7 +23,6 @@
 
 class tr_rpc_address;
 struct tr_session;
-struct tr_variant;
 
 namespace tr
 {

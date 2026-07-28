@@ -10,11 +10,9 @@
 
 // --- Basic Types
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
-#include <functional>
 #include <optional>
 #include <span>
 #include <string>

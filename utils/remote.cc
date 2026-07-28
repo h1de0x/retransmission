@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype> // isspace
-#include <cmath> // floor
 #include <chrono>
+#include <cmath> // floor
 #include <cstdint> // int64_t
 #include <cstdio>
 #include <cstdlib>
@@ -17,6 +17,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <string>
 #include <string_view>
@@ -27,9 +28,8 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
-#include <libtransmission/transmission.h>
-
 #include <libtransmission/api-compat.h>
+#include <libtransmission/constants.h>
 #include <libtransmission/crypto-utils.h>
 #include <libtransmission/env.h>
 #include <libtransmission/file-utils.h>
@@ -40,6 +40,7 @@
 #include <libtransmission/string-utils.h>
 #include <libtransmission/tr-assert.h>
 #include <libtransmission/tr-getopt.h>
+#include <libtransmission/types.h>
 #include <libtransmission/utils.h>
 #include <libtransmission/values.h>
 #include <libtransmission/variant.h>

@@ -9,7 +9,6 @@
 #error only libtransmission should #include this header.
 #endif
 
-#include <array>
 #include <bitset>
 #include <cstddef> // size_t
 #include <ctime> // for time_t
@@ -19,8 +18,6 @@
 #include "libtransmission/session-settings.h"
 #include "libtransmission/types.h" // for TR_SCHED_ALL
 #include "libtransmission/values.h"
-
-struct tr_variant;
 
 /** Manages alternate speed limits and a scheduler to auto-toggle them. */
 class tr_session_alt_speeds
