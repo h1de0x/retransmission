@@ -5,14 +5,13 @@
 
 #include <algorithm>
 #include <array>
-#include <condition_variable>
 #include <cstdint> // int64_t
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <chrono>
+#include <future>
 #include <iterator> // std::back_inserter
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -96,32 +95,15 @@ int parseCommandLine(app_opts& opts, int argc, char const* const* argv)
             opts.show_bytesize = true;
             break;
 
-        case 'f':
-            opts.print_header = false;
-            opts.print_info = false;
-            opts.print_trackers = false;
-            opts.print_files = true;
-            break;
-
+        // these select a single section, so each one clears the others
         case 'd':
-            opts.print_header = true;
-            opts.print_info = false;
-            opts.print_trackers = false;
-            opts.print_files = false;
-            break;
-
         case 'i':
-            opts.print_header = false;
-            opts.print_info = true;
-            opts.print_trackers = false;
-            opts.print_files = false;
-            break;
-
         case 't':
-            opts.print_header = false;
-            opts.print_info = false;
-            opts.print_trackers = true;
-            opts.print_files = false;
+        case 'f':
+            opts.print_header = c == 'd';
+            opts.print_info = c == 'i';
+            opts.print_trackers = c == 't';
+            opts.print_files = c == 'f';
             break;
 
         case 'D':
@@ -173,21 +155,6 @@ int parseCommandLine(app_opts& opts, int argc, char const* const* argv)
     return now == 0 ? "Unknown" : fmt::format("{:%a %b %d %T %Y}", *std::localtime(&now));
 }
 
-bool compareSecondField(std::string_view l, std::string_view r)
-{
-    auto const lpos = l.find(' ');
-    if (lpos == std::string_view::npos) {
-        return false;
-    }
-
-    auto const rpos = r.find(' ');
-    if (rpos == std::string_view::npos) {
-        return true;
-    }
-
-    return l.substr(lpos) <= r.substr(rpos);
-}
-
 void showInfo(app_opts const& opts, tr_torrent_metainfo const& metainfo)
 {
     /**
@@ -228,7 +195,7 @@ void showInfo(app_opts const& opts, tr_torrent_metainfo const& metainfo)
         auto current_tier = std::optional<tr_tracker_tier_t>{};
         auto print_tier = size_t{ 1 };
         for (auto const& tracker : metainfo.announce_list()) {
-            if (!current_tier || current_tier != tracker.tier) {
+            if (current_tier != tracker.tier) {
                 current_tier = tracker.tier;
                 fmt::print("\n  Tier #{:d}\n", print_tier);
                 ++print_tier;
@@ -236,10 +203,6 @@ void showInfo(app_opts const& opts, tr_torrent_metainfo const& metainfo)
 
             fmt::print("  {:s}\n", tracker.announce.sv());
         }
-
-        /**
-        ***
-        **/
 
         if (auto const n_webseeds = metainfo.webseed_count(); n_webseeds > 0) {
             fmt::print("\nWEBSEEDS\n\n");
@@ -259,49 +222,44 @@ void showInfo(app_opts const& opts, tr_torrent_metainfo const& metainfo)
             fmt::print("\nFILES\n\n");
         }
 
-        auto filenames = std::vector<std::string>{};
+        // `subpath` borrows from `metainfo` and is kept for sorting: a bytesize
+        // line leads with the size, which would dominate a sort of whole lines.
+        struct Row {
+            std::string_view subpath;
+            std::string line;
+        };
+
+        auto rows = std::vector<Row>{};
+        rows.reserve(metainfo.file_count());
         for (tr_file_index_t i = 0, n = metainfo.file_count(); i < n; ++i) {
-            std::string filename;
-            if (opts.show_bytesize) {
-                filename = std::to_string(metainfo.file_size(i));
-                filename += " ";
-                filename += metainfo.file_subpath(i);
-            } else {
-                filename = "  ";
-                filename += metainfo.file_subpath(i);
-                filename += " (";
-                filename += Storage{ metainfo.file_size(i), Storage::Units::Bytes }.to_string();
-                filename += ')';
-            }
-            filenames.emplace_back(filename);
+            auto const& subpath = metainfo.file_subpath(i);
+            auto line = opts.show_bytesize ?
+                fmt::format("{:d} {:s}", metainfo.file_size(i), subpath) :
+                fmt::format("  {:s} ({:s})", subpath, Storage{ metainfo.file_size(i), Storage::Units::Bytes }.to_string());
+            rows.push_back({ subpath, std::move(line) });
         }
 
         if (!opts.unsorted) {
             if (opts.show_bytesize) {
-                std::sort(std::begin(filenames), std::end(filenames), compareSecondField);
+                std::ranges::sort(rows, {}, &Row::subpath);
             } else {
-                std::sort(std::begin(filenames), std::end(filenames));
+                std::ranges::sort(rows, {}, &Row::line);
             }
         }
 
-        for (auto const& filename : filenames) {
-            fmt::print("{:s}\n", filename);
+        for (auto const& row : rows) {
+            fmt::print("{:s}\n", row.line);
         }
     }
 }
 
 void doScrape(tr_torrent_metainfo const& metainfo)
 {
-    class Mediator final : public tr_web::Mediator
-    {
-        [[nodiscard]] std::chrono::steady_clock::time_point now() const override
-        {
-            return std::chrono::steady_clock::now();
-        }
-    };
-
-    auto mediator = Mediator{};
+    auto mediator = tr_web::Mediator{};
     auto web = tr_web::create(mediator);
+
+    auto const& hash = metainfo.info_hash();
+    auto const hash_sv = std::string_view{ reinterpret_cast<char const*>(std::data(hash)), std::size(hash) };
 
     for (auto const& tracker : metainfo.announce_list()) {
         if (std::empty(tracker.scrape)) {
@@ -312,24 +270,21 @@ void doScrape(tr_torrent_metainfo const& metainfo)
         auto scrape_url = tr_urlbuf{ tracker.scrape.sv() };
         auto delimiter = tr_strv_contains(scrape_url, '?') ? '&' : '?';
         scrape_url.append(delimiter, "info_hash=");
-        tr_urlPercentEncode(std::back_inserter(scrape_url), metainfo.info_hash());
+        tr_urlPercentEncode(std::back_inserter(scrape_url), hash);
         fmt::print("{:s} ... ", scrape_url);
         fflush(stdout);
 
-        // execute the http scrape
-        auto response = tr_web::FetchResponse{};
-        auto response_mutex = std::mutex{};
-        auto response_cv = std::condition_variable{};
-        auto lock = std::unique_lock(response_mutex);
+        // execute the http scrape.
+        // the callback runs on tr_web's own thread;
+        // the promise hands the response back to this one.
+        auto response_promise = std::promise<tr_web::FetchResponse>{};
+        auto response_future = response_promise.get_future();
         web->fetch(
             { scrape_url,
-              [&response, &response_cv](tr_web::FetchResponse const& resp) {
-                  response = resp;
-                  response_cv.notify_one();
-              },
+              [&response_promise](tr_web::FetchResponse const& resp) { response_promise.set_value(resp); },
               nullptr,
               TimeoutSecs });
-        response_cv.wait(lock);
+        auto const response = response_future.get();
 
         // check the response code
         if (auto const code = response.status; code != 200 /*HTTP OK*/) {
@@ -338,32 +293,30 @@ void doScrape(tr_torrent_metainfo const& metainfo)
         }
 
         // print it out
-        auto otop = tr_variant_serde::benc().inplace().parse(response.body);
-        if (!!otop) {
+        auto const otop = tr_variant_serde::benc().inplace().parse(response.body);
+        if (!otop) {
             fmt::print("error parsing scrape response\n");
             continue;
         }
-        auto& top = *otop;
 
-        bool matched = false;
-        if (tr_variant* files = nullptr; tr_variantDictFindDict(&top, TR_KEY_files, &files)) {
-            size_t child_pos = 0;
-            tr_quark key;
-            tr_variant* val;
+        // the swarm counts are keyed by raw info hash under "files"
+        auto const* const top = otop->get_if<tr_variant::Map>();
+        auto const* const files = top != nullptr ? top->find_if<tr_variant::Map>(TR_KEY_files) : nullptr;
+        auto matched = false;
 
-            auto hashsv = std::string_view{ reinterpret_cast<char const*>(std::data(metainfo.info_hash())),
-                                            std::size(metainfo.info_hash()) };
-
-            while (tr_variantDictChild(files, child_pos, &key, &val)) {
-                if (hashsv == tr_quark_get_string_view(key)) {
-                    auto i = int64_t{};
-                    auto const seeders = tr_variantDictFindInt(val, TR_KEY_complete, &i) ? int(i) : -1;
-                    auto const leechers = tr_variantDictFindInt(val, TR_KEY_incomplete, &i) ? int(i) : -1;
-                    fmt::print("{:d} seeders, {:d} leechers\n", seeders, leechers);
-                    matched = true;
+        if (files != nullptr) {
+            for (auto const& [key, val] : *files) {
+                if (hash_sv != tr_quark_get_string_view(key)) {
+                    continue;
                 }
 
-                ++child_pos;
+                auto const* const counts = val.get_if<tr_variant::Map>();
+                auto const count_of = [counts](tr_quark const quark) {
+                    // -1 means the tracker did not report the count
+                    return counts != nullptr ? counts->value_if<int64_t>(quark).value_or(-1) : -1;
+                };
+                fmt::print("{:d} seeders, {:d} leechers\n", count_of(TR_KEY_complete), count_of(TR_KEY_incomplete));
+                matched = true;
             }
         }
 
