@@ -544,6 +544,7 @@ tr_variant from_pex(tr_pex const& val)
 
     return pex;
 }
+
 } // unnamed namespace
 
 // ---

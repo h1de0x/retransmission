@@ -24,9 +24,6 @@
 
 #include <small/map.hpp>
 
-#define ZLIB_CONST
-#include <zlib.h>
-
 #include "libtransmission/transmission.h"
 
 #include "libtransmission/announcer.h"
@@ -1433,89 +1430,30 @@ void portTest(tr_session* session, tr_variant::Map const& args_in, struct tr_rpc
 
 // ---
 
-void onBlocklistFetched(tr_web::FetchResponse const& web_response)
+void blocklistUpdate(tr_session* session, tr_variant::Map const& /*args_in*/, struct tr_rpc_idle_data* idle_data)
 {
     using namespace JsonRpc;
 
-    auto const& [status, headers, body, primary_ip, did_connect, did_timeout, user_data] = web_response;
-    auto* data = static_cast<struct tr_rpc_idle_data*>(user_data);
-    auto* const session = data->session;
+    tr_blocklistUpdate(session, [idle_data](tr_blocklist_update_result const& result) {
+        switch (result.status) {
+        case tr_blocklist_update_status::Ok:
+            idle_data->args_out.try_emplace(TR_KEY_blocklist_size, result.n_rules);
+            tr_rpc_idle_done(idle_data, Error::SUCCESS, {});
+            break;
 
-    if (status != 200) {
-        // we failed to download the blocklist...
-        tr_rpc_idle_done(
-            data,
-            Error::HTTP_ERROR,
-            fmt::format(
-                fmt::runtime(_("Couldn't fetch blocklist: {error} ({error_code})")),
-                fmt::arg("error", tr_webGetResponseStr(status)),
-                fmt::arg("error_code", status)));
-        return;
-    }
+        case tr_blocklist_update_status::DownloadError:
+            tr_rpc_idle_done(idle_data, Error::HTTP_ERROR, result.error);
+            break;
 
-    // see if we need to decompress the content
-    auto content = std::vector<char>{};
-    content.resize(1024 * 128);
-    for (;;) {
-        auto strm = z_stream{};
-        // 15 + 16 => window bits 31 = gzip wrapper (15 alone = zlib, -15 = raw deflate)
-        inflateInit2(&strm, 15 + 16);
-        strm.next_in = reinterpret_cast<Bytef const*>(std::data(body));
-        strm.avail_in = static_cast<uInt>(std::size(body));
-        strm.next_out = reinterpret_cast<Bytef*>(std::data(content));
-        strm.avail_out = static_cast<uInt>(std::size(content));
-        auto const rc = inflate(&strm, Z_FINISH);
-        auto const actual_size = strm.total_out;
-        inflateEnd(&strm);
+        case tr_blocklist_update_status::SaveError:
+            tr_rpc_idle_done(idle_data, Error::SYSTEM_ERROR, result.error);
+            break;
 
-        if (rc == Z_STREAM_END) {
-            // shrink buffer to actual size
-            content.resize(actual_size);
-        } else if (strm.avail_out == 0) {
-            // need a bigger buffer
-            content.resize(content.size() * 2);
-            continue;
-        } else {
-            // couldn't decompress it; maybe we downloaded an uncompressed file
-            content.assign(std::begin(body), std::end(body));
+        case tr_blocklist_update_status::InvalidData:
+            tr_rpc_idle_done(idle_data, Error::INVALID_BLOCKLIST_DATA, result.error);
+            break;
         }
-        break;
-    }
-
-    // tr_blocklistSetContent needs a source file,
-    // so save content into a tmpfile
-    auto const filename = tr_pathbuf{ session->configDir(), "/blocklist.tmp"sv };
-    if (auto error = tr_error{}; !tr_file_save(filename, content, &error)) {
-        tr_rpc_idle_done(
-            data,
-            Error::SYSTEM_ERROR,
-            fmt::format(
-                fmt::runtime(_("Couldn't save '{path}': {error} ({error_code})")),
-                fmt::arg("path", filename),
-                fmt::arg("error", error.message()),
-                fmt::arg("error_code", error.code())));
-        return;
-    }
-
-    // feed it to the session and give the client a response
-    auto const blocklist_size = tr_blocklistSetContent(session, filename);
-    tr_sys_path_remove(filename);
-    if (!blocklist_size) {
-        tr_rpc_idle_done(data, Error::INVALID_BLOCKLIST_DATA, {});
-        return;
-    }
-    data->args_out.try_emplace(TR_KEY_blocklist_size, *blocklist_size);
-    tr_rpc_idle_done(data, Error::SUCCESS, {});
-}
-
-void blocklistUpdate(tr_session* session, tr_variant::Map const& /*args_in*/, struct tr_rpc_idle_data* idle_data)
-{
-    session->fetch(
-        {
-            session->blocklistUrl(),
-            [](tr_web::FetchResponse const& r) { onBlocklistFetched(r); },
-            idle_data,
-        });
+    });
 }
 
 // ---
@@ -1975,6 +1913,11 @@ using SessionAccessors = std::pair<SessionGetter, SessionSetter>;
         });
 
     map.try_emplace(
+        TR_KEY_blocklist_date,
+        [](tr_session const& src) -> tr_variant { return static_cast<int64_t>(tr_blocklistGetMTime(&src)); },
+        nullptr);
+
+    map.try_emplace(
         TR_KEY_blocklist_enabled,
         [](tr_session const& src) -> tr_variant { return src.blocklist_enabled(); },
         [](tr_session& tgt, tr_variant const& src, ErrorInfo& /*err*/) {
@@ -1987,6 +1930,15 @@ using SessionAccessors = std::pair<SessionGetter, SessionSetter>;
         TR_KEY_blocklist_size,
         [](tr_session const& src) -> tr_variant { return tr_blocklistGetRuleCount(&src); },
         nullptr);
+
+    map.try_emplace(
+        TR_KEY_blocklist_updates_enabled,
+        [](tr_session const& src) -> tr_variant { return src.blocklist_updates_enabled(); },
+        [](tr_session& tgt, tr_variant const& src, ErrorInfo& /*err*/) {
+            if (auto const val = src.value_if<bool>()) {
+                tgt.set_blocklist_updates_enabled(*val);
+            }
+        });
 
     map.try_emplace(
         TR_KEY_blocklist_url,

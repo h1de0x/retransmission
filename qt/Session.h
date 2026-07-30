@@ -148,6 +148,7 @@ signals:
     void statsUpdated();
     void sessionUpdated();
     void blocklistUpdated(int64_t);
+    void blocklistUpdateFailed(QString const& message);
     void torrentsUpdated(tr_variant* torrent_list, bool complete_list);
     void torrentsRemoved(tr_variant* torrent_list);
     void sessionCalled(Tag);

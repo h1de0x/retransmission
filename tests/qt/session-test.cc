@@ -136,6 +136,93 @@ private slots:
         // being left in flight (and leaked) when the test tears down.
         QVERIFY(waitUntil([&session_get_done]() { return !session_get_done.isEmpty(); }));
     }
+
+    // Toggling blocklist_updates_enabled (now a session-owned pref) must push a
+    // session_set carrying it, i.e. the client asks the session to (dis)arm its
+    // periodic blocklist auto-update over RPC.
+    void auto_update_toggle_posts_session_set()
+    {
+        api_compat::set_default_style(Style::Tr5);
+
+        auto const sandbox_dir = sandboxDir();
+        auto server = MockRpcServer{};
+
+        auto prefs = Prefs{};
+        prefs.set(TR_KEY_remote_session_enabled, true);
+        prefs.set(TR_KEY_remote_session_host, QStringLiteral("127.0.0.1"));
+        prefs.set(TR_KEY_remote_session_port, static_cast<int>(server.port()));
+
+        auto rpc = RpcClient{};
+        auto session = Session{ sandbox_dir, prefs, rpc };
+        session.restart();
+
+        // toggling the pref is a bare session_set (no follow-up session_get to
+        // drain), so just assert it reaches the wire
+        prefs.set(TR_KEY_blocklist_updates_enabled, !prefs.get<bool>(TR_KEY_blocklist_updates_enabled));
+
+        auto const has_session_set = [&server]() {
+            auto const bodies = server.request_bodies();
+            return std::ranges::any_of(bodies, [](std::string const& body) {
+                auto const q = QString::fromStdString(body);
+                return q.contains(QStringLiteral("session_set")) && q.contains(QStringLiteral("blocklist_updates_enabled"));
+            });
+        };
+        QVERIFY(waitUntil(has_session_set));
+    }
+
+    // A blocklist_update reply maps to the right signal: a success reports the new
+    // rule count via blocklistUpdated(); a JSON-RPC error reports its message via
+    // blocklistUpdateFailed(). The two signals never both fire.
+    static void blocklist_update_reports_result_data()
+    {
+        QTest::addColumn<QString>("reply");
+        QTest::addColumn<qlonglong>("expect_size"); // < 0 means expect the failure signal instead
+        QTest::addColumn<QString>("expect_error");
+
+        QTest::newRow("ok") << QStringLiteral(R"({"result":"success","arguments":{"blocklist_size":42}})") << 42LL << QString{};
+        // An error must resolve via the queue's error handler, or the caller waits
+        // forever for a reply that maps to no signal. Escaped literals, not raw
+        // ones: moc mis-lexes an apostrophe inside a raw string and then silently
+        // emits no metaobject for this class.
+        QTest::newRow("download_error") << QStringLiteral(
+                                               "{\"result\":\"Couldn\'t fetch blocklist: Not Found\",\"arguments\":{}}")
+                                        << -1LL << QStringLiteral("Couldn\'t fetch blocklist: Not Found");
+    }
+    void blocklist_update_reports_result()
+    {
+        QFETCH(QString const, reply);
+        QFETCH(qlonglong const, expect_size);
+        QFETCH(QString const, expect_error);
+
+        api_compat::set_default_style(Style::Tr5);
+
+        auto server = MockRpcServer{};
+        // quoted, so the marker can't also match a `blocklist_updates_enabled` request
+        server.set_reply_for(R"("blocklist_update")", reply.toStdString());
+
+        auto prefs = Prefs{};
+        prefs.set(TR_KEY_remote_session_enabled, true);
+        prefs.set(TR_KEY_remote_session_host, QStringLiteral("127.0.0.1"));
+        prefs.set(TR_KEY_remote_session_port, static_cast<int>(server.port()));
+
+        auto rpc = RpcClient{};
+        auto session = Session{ sandboxDir(), prefs, rpc };
+        session.restart();
+
+        auto updated = QSignalSpy{ &session, &Session::blocklistUpdated };
+        auto failed = QSignalSpy{ &session, &Session::blocklistUpdateFailed };
+        session.updateBlocklist();
+
+        if (expect_size >= 0) {
+            QVERIFY(waitUntil([&updated]() { return !updated.isEmpty(); }));
+            QCOMPARE(updated.first().at(0).toLongLong(), expect_size);
+            QVERIFY(failed.isEmpty());
+        } else {
+            QVERIFY(waitUntil([&failed]() { return !failed.isEmpty(); }));
+            QCOMPARE(failed.first().at(0).toString(), expect_error);
+            QVERIFY(updated.isEmpty());
+        }
+    }
 };
 } // namespace
 
