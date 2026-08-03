@@ -16,8 +16,6 @@
 #include <optional>
 #include <utility> // std::pair
 
-#include <event2/util.h> // for evutil_socket_t
-
 #include "libtransmission/bandwidth.h"
 #include "libtransmission/digest.h"
 #include "libtransmission/peer-mse.h"
