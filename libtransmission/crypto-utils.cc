@@ -8,7 +8,6 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
 #include <optional>
 #include <ranges>
 #include <random>
@@ -25,7 +24,6 @@ extern "C" {
 
 #include "libtransmission/crypto-utils.h"
 #include "libtransmission/string-utils.h"
-#include "libtransmission/tr-assert.h"
 
 using namespace std::literals;
 
@@ -33,14 +31,10 @@ using namespace std::literals;
 
 namespace
 {
-constexpr auto TrSha1DigestStrlen = size_t{ 40 };
-
-constexpr auto TrSha256DigestStrlen = size_t{ 64 };
-
 namespace ssha1_impl
 {
 
-auto constexpr DigestStringSize = TrSha1DigestStrlen;
+auto constexpr DigestStringSize = tr_sha1_string::Strlen;
 auto constexpr SaltedPrefix = "{"sv;
 
 std::string tr_salt(std::string_view plaintext, std::string_view salt)
@@ -52,7 +46,7 @@ std::string tr_salt(std::string_view plaintext, std::string_view salt)
 
     // convert it to a string. string holds three parts:
     // DigestPrefix, stringified digest of plaintext + salt, and the salt.
-    return fmt::format("{:s}{:s}{:s}", SaltedPrefix, tr_sha1_to_string(digest), salt);
+    return fmt::format("{:s}{:s}{:s}", SaltedPrefix, tr_sha1_string{ digest }, salt);
 }
 
 } // namespace ssha1_impl
@@ -115,18 +109,6 @@ namespace
 namespace hex_impl
 {
 
-template<typename InIt, typename OutIt>
-constexpr void tr_binary_to_hex(InIt begin, InIt end, OutIt out)
-{
-    auto constexpr Hex = "0123456789abcdef"sv;
-
-    while (begin != end) {
-        auto const val = static_cast<unsigned int>(*begin++);
-        *out++ = Hex[val >> 4];
-        *out++ = Hex[val & 0xF];
-    }
-}
-
 constexpr void tr_hex_to_binary(char const* input, void* voutput, size_t byte_length)
 {
     auto constexpr Hex = "0123456789abcdef"sv;
@@ -143,31 +125,11 @@ constexpr void tr_hex_to_binary(char const* input, void* voutput, size_t byte_le
 } // namespace hex_impl
 } // namespace
 
-tr_sha1_string tr_sha1_to_string(tr_sha1_digest_t const& digest)
-{
-    using namespace hex_impl;
-
-    auto str = tr_sha1_string{};
-    tr_binary_to_hex(std::begin(digest), std::end(digest), std::back_inserter(str));
-    TR_ASSERT(std::size(str) == TrSha1DigestStrlen);
-    return str;
-}
-
-tr_sha256_string tr_sha256_to_string(tr_sha256_digest_t const& digest)
-{
-    using namespace hex_impl;
-
-    auto str = tr_sha256_string{};
-    tr_binary_to_hex(std::begin(digest), std::end(digest), std::back_inserter(str));
-    TR_ASSERT(std::size(str) == TrSha256DigestStrlen);
-    return str;
-}
-
 std::optional<tr_sha1_digest_t> tr_sha1_from_string(std::string_view hex)
 {
     using namespace hex_impl;
 
-    if (std::size(hex) != TrSha1DigestStrlen) {
+    if (std::size(hex) != tr_sha1_string::Strlen) {
         return {};
     }
 
@@ -184,7 +146,7 @@ std::optional<tr_sha256_digest_t> tr_sha256_from_string(std::string_view hex)
 {
     using namespace hex_impl;
 
-    if (std::size(hex) != TrSha256DigestStrlen) {
+    if (std::size(hex) != tr_sha256_string::Strlen) {
         return {};
     }
 

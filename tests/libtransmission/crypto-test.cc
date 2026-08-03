@@ -117,13 +117,13 @@ TEST(Crypto, sha1)
             std::size(hash1)));
 
     auto const hash3 = tr_sha1::digest("test"sv);
-    EXPECT_EQ("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"sv, tr_sha1_to_string(hash3));
+    EXPECT_EQ("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"sv, tr_sha1_string{ hash3 });
 
     auto const hash4 = tr_sha1::digest("te"sv, "st"sv);
-    EXPECT_EQ("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"sv, tr_sha1_to_string(hash4));
+    EXPECT_EQ("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"sv, tr_sha1_string{ hash4 });
 
     auto const hash5 = tr_sha1::digest("t"sv, "e"sv, std::string{ "s" }, std::to_array<char>({ 't' }));
-    EXPECT_EQ("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"sv, tr_sha1_to_string(hash5));
+    EXPECT_EQ("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"sv, tr_sha1_string{ hash5 });
 }
 
 TEST(Crypto, ssha1)
@@ -171,6 +171,25 @@ TEST(Crypto, ssha1)
     EXPECT_TRUE(tr_ssha1_matches("{d209a21d3bc4f8fc4f8faf347e69f3def597eb170pySy4ai1ZPMjeU1", "test"));
 }
 
+TEST(Crypto, hashString)
+{
+    // a default-constructed instance is the empty "no digest yet" state
+    auto const empty = tr_sha1_string{};
+    EXPECT_TRUE(empty.empty());
+    EXPECT_EQ(0U, std::size(empty));
+    EXPECT_EQ(""sv, empty.sv());
+    EXPECT_EQ('\0', *empty.c_str());
+    EXPECT_EQ(empty, tr_sha1_string{});
+
+    auto const full = tr_sha1_string{ tr_sha1::digest("test"sv) };
+    EXPECT_FALSE(full.empty());
+    EXPECT_EQ(tr_sha1_string::Strlen, std::size(full));
+    EXPECT_EQ("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"sv, full);
+
+    // an empty instance sorts before any complete one, as an empty string would
+    EXPECT_LT(empty, full);
+}
+
 TEST(Crypto, sha1FromString)
 {
     // bad lengths
@@ -186,7 +205,7 @@ TEST(Crypto, sha1FromString)
     auto const lc = tr_sha1_from_string(baseline);
     EXPECT_TRUE(lc.has_value());
     assert(lc.has_value());
-    EXPECT_EQ(baseline, tr_sha1_to_string(*lc));
+    EXPECT_EQ(baseline, tr_sha1_string{ *lc });
 
     // uppercase hex should yield the same result
     auto const uc = tr_sha1_from_string(tr_strupper(baseline));
@@ -212,7 +231,7 @@ TEST(Crypto, sha256FromString)
     auto const lc = tr_sha256_from_string(baseline);
     EXPECT_TRUE(lc.has_value());
     assert(lc.has_value());
-    EXPECT_EQ(baseline, tr_sha256_to_string(*lc));
+    EXPECT_EQ(baseline, tr_sha256_string{ *lc });
 
     // uppercase hex should yield the same result
     auto const uc = tr_sha256_from_string(tr_strupper(baseline));
