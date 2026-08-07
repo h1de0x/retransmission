@@ -50,7 +50,6 @@
 #include "libtransmission/error.h"
 #include "libtransmission/file.h"
 #include "libtransmission/tr-assert.h"
-#include "libtransmission/macros.h" // TR_UCLIBC_CHECK_VERSION
 #include "libtransmission/tr-strbuf.h"
 
 #ifndef O_LARGEFILE
@@ -68,21 +67,6 @@
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
-#endif
-
-// don't use pread/pwrite on old versions of uClibc because they're buggy.
-#if defined(__UCLIBC__) && !TR_UCLIBC_CHECK_VERSION(0, 9, 28)
-#undef HAVE_PREAD
-#undef HAVE_PWRITE
-#endif
-
-#ifdef __APPLE__
-#ifndef HAVE_PREAD
-#define HAVE_PREAD
-#endif
-#ifndef HAVE_PWRITE
-#define HAVE_PWRITE
-#endif
 #endif
 
 using namespace std::literals;
@@ -521,16 +505,7 @@ bool tr_sys_file_read_at(
 
     bool ret = false;
 
-#ifdef HAVE_PREAD
-
     auto const my_bytes_read = pread(handle, buffer, size, static_cast<off_t>(offset));
-
-#else
-
-    ssize_t const my_bytes_read = lseek(handle, static_cast<off_t>(offset), SEEK_SET) == -1 ? -1 : read(handle, buffer, size);
-
-#endif
-
     static_assert(sizeof(*bytes_read) >= sizeof(my_bytes_read));
 
     if (my_bytes_read > 0) {
@@ -584,16 +559,7 @@ bool tr_sys_file_write_at(
 
     bool ret = false;
 
-#ifdef HAVE_PWRITE
-
     auto const my_bytes_written = pwrite(handle, buffer, size, static_cast<off_t>(offset));
-
-#else
-
-    ssize_t const my_bytes_written = lseek(handle, static_cast<off_t>(offset), SEEK_SET) == -1 ? -1 :
-                                                                                                 write(handle, buffer, size);
-
-#endif
 
     static_assert(sizeof(*bytes_written) >= sizeof(my_bytes_written));
 
