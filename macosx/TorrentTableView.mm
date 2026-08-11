@@ -326,7 +326,12 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
         return torrentCell;
     } else {
         TorrentGroup* group = (TorrentGroup*)item;
-        GroupCell* groupCell = [outlineView makeViewWithIdentifier:@"GroupCell" owner:self];
+        // TODO(lolgear): Remove group cell from xib.
+        GroupCell* groupCell = [outlineView makeViewWithIdentifier:@"NewGroupCell" owner:self];
+        if (!groupCell) {
+            groupCell = [[GroupCell alloc] initWithFrame:NSZeroRect];
+            groupCell.identifier = @"NewGroupCell";
+        }
 
         NSInteger groupIndex = group.groupIndex;
 
