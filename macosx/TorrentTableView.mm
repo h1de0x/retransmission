@@ -28,28 +28,6 @@ static CGFloat const kErrorImageSize = 20.0;
 
 static NSTimeInterval const kToggleProgressSeconds = 0.175;
 
-@interface NSIndexSet (Transmission)
-- (NSIndexSet*)symmetricDifference:(NSIndexSet*)otherSet;
-@end
-
-@implementation NSIndexSet (Transmission)
-
-- (NSIndexSet*)symmetricDifference:(NSIndexSet*)otherSet
-{
-    NSMutableIndexSet* result = [self mutableCopy];
-    [result addIndexes:otherSet];
-
-    [self enumerateIndexesUsingBlock:^(NSUInteger idx, BOOL*) {
-        if ([otherSet containsIndex:idx]) {
-            [result removeIndex:idx];
-        }
-    }];
-
-    return [result copy];
-}
-
-@end
-
 @interface TorrentTableView ()
 
 @property(nonatomic) IBOutlet Controller* fController;
@@ -61,8 +39,6 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
 @property(nonatomic) IBOutlet NSMenu* fContextRow;
 @property(nonatomic) IBOutlet NSMenu* fContextNoRow;
 
-@property(nonatomic) NSIndexSet* fSelectedRowIndexes;
-
 @property(nonatomic) CGFloat piecesBarPercent;
 @property(nonatomic) NSAnimation* fPiecesBarAnimation;
 
@@ -70,8 +46,6 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
 @property(nonatomic) NSView* fPositioningView;
 
 @property(nonatomic) NSDictionary* fHoverEventDict;
-
-@property(nonatomic) NSMutableIndexSet* fPendingSelectionReloadRows;
 
 @end
 
@@ -397,35 +371,6 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
     } else {
         return [self.dataSource outlineView:outlineView objectValueForTableColumn:[self tableColumnWithIdentifier:@"Group"]
                                      byItem:item];
-    }
-}
-
-- (void)outlineViewSelectionDidChange:(NSNotification*)notification
-{
-    NSIndexSet* oldSelection = self.fSelectedRowIndexes ?: [NSIndexSet indexSet];
-    NSIndexSet* newSelection = self.selectedRowIndexes;
-    self.fSelectedRowIndexes = newSelection;
-
-    NSIndexSet* changedRows = [oldSelection symmetricDifference:newSelection];
-    if (changedRows.count > 0) {
-        if (!self.fPendingSelectionReloadRows) {
-            self.fPendingSelectionReloadRows = [[NSMutableIndexSet alloc] init];
-            [self performSelector:@selector(flushSelectionReload) withObject:nil afterDelay:0 inModes:@[ NSRunLoopCommonModes ]];
-        }
-
-        [self.fPendingSelectionReloadRows addIndexes:changedRows];
-    }
-}
-
-- (void)flushSelectionReload
-{
-    NSMutableIndexSet* rows = self.fPendingSelectionReloadRows;
-    self.fPendingSelectionReloadRows = nil;
-
-    NSInteger const numberOfRows = self.numberOfRows;
-    [rows removeIndexesInRange:NSMakeRange(numberOfRows, NSIntegerMax - numberOfRows)];
-    if (rows.count > 0) {
-        [self reloadDataForRowIndexes:rows columnIndexes:[NSIndexSet indexSetWithIndex:0]];
     }
 }
 

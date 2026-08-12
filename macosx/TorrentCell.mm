@@ -6,7 +6,6 @@
 #import "ProgressBarView.h"
 #import "ProgressGradients.h"
 #import "Torrent.h"
-#import "NSImageAdditions.h"
 
 @implementation TorrentCell
 
@@ -21,9 +20,7 @@
 
         // set priority icon
         if (torrent.priority != TR_PRI_NORMAL) {
-            NSColor* priorityColor = self.backgroundStyle == NSBackgroundStyleEmphasized ? NSColor.whiteColor : NSColor.labelColor;
-            NSImage* priorityImage = [[NSImage imageNamed:(torrent.priority == TR_PRI_HIGH ? @"PriorityHighTemplate" : @"PriorityLowTemplate")]
-                imageWithColor:priorityColor];
+            NSImage* priorityImage = [NSImage imageNamed:(torrent.priority == TR_PRI_HIGH ? @"PriorityHighTemplate" : @"PriorityLowTemplate")];
 
             self.fTorrentPriorityView.image = priorityImage;
 
@@ -40,6 +37,14 @@
 - (BOOL)isFlipped
 {
     return YES;
+}
+
+- (void)setBackgroundStyle:(NSBackgroundStyle)backgroundStyle
+{
+    [super setBackgroundStyle:backgroundStyle];
+
+    NSColor* priorityColor = backgroundStyle == NSBackgroundStyleEmphasized ? NSColor.whiteColor : NSColor.labelColor;
+    self.fTorrentPriorityView.contentTintColor = priorityColor;
 }
 
 @end
