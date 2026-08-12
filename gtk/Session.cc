@@ -16,6 +16,7 @@
 #include <libtransmission/macros.h>
 #include <libtransmission/rpcimpl.h>
 #include <libtransmission/string-utils.h>
+#include <libtransmission/torrent-builder.h>
 #include <libtransmission/torrent-metainfo.h>
 #include <libtransmission/transmission.h>
 #include <libtransmission/utils.h> // tr_time()
@@ -87,7 +88,7 @@ public:
     void torrents_added();
 
     void add_files(std::vector<Glib::RefPtr<Gio::File>> const& files, bool do_start, bool do_prompt, bool do_notify);
-    void add_ctor(tr_ctor* ctor, bool do_prompt, bool do_notify);
+    void add_builder(std::unique_ptr<tr_torrent_builder> builder, bool do_prompt, bool do_notify);
     void add_torrent(Glib::RefPtr<Torrent> const& torrent, bool do_notify);
     bool add_from_url(Glib::ustring const& url);
 
@@ -149,11 +150,11 @@ private:
     void add_file_async_callback(
         Glib::RefPtr<Gio::File> const& file,
         Glib::RefPtr<Gio::AsyncResult>& result,
-        tr_ctor* ctor,
+        std::unique_ptr<tr_torrent_builder> builder,
         bool do_prompt,
         bool do_notify);
 
-    Glib::RefPtr<Torrent> create_new_torrent(tr_ctor* ctor);
+    Glib::RefPtr<Torrent> create_new_torrent(tr_torrent_builder* builder);
 
     void update_sleep_inhibitor();
 
@@ -175,7 +176,7 @@ private:
     Session& core_;
 
     sigc::signal<void(ErrorCode, Glib::ustring const&)> signal_add_error_;
-    sigc::signal<void(tr_ctor*)> signal_add_prompt_;
+    sigc::signal<void(tr_torrent_builder*)> signal_add_prompt_;
     sigc::signal<void(bool)> signal_blocklist_updated_;
     sigc::signal<void(bool)> signal_busy_;
     sigc::signal<void(tr_quark)> signal_prefs_changed_;
@@ -638,23 +639,20 @@ void Session::Impl::add_torrent(Glib::RefPtr<Torrent> const& torrent, bool do_no
     }
 }
 
-Glib::RefPtr<Torrent> Session::Impl::create_new_torrent(tr_ctor* ctor)
+Glib::RefPtr<Torrent> Session::Impl::create_new_torrent(tr_torrent_builder* builder)
 {
-    bool do_trash = false;
-
     // let the gtk client handle the removal, since libT
     // doesn't have any concept of the glib trash API
-    tr_ctorGetDeleteSource(ctor, &do_trash);
-    tr_ctorSetDeleteSource(ctor, false);
-    tr_torrent* const tor = tr_torrentNew(ctor, nullptr);
+    auto const do_trash = tr_sessionGetDeleteSource(session_);
+    tr_torrent* const tor = tr_torrentNew(builder, nullptr);
 
     if (tor != nullptr && do_trash) {
-        if (std::optional<std::string> const source = tr_ctorGetSourceFile(ctor)) {
+        if (auto const& source = builder->source_filename(); !std::empty(source)) {
             // #1294: don't delete the .torrent file if it's our internal copy
             std::string const config_dir = tr_sessionGetConfigDir(session_);
-            bool const is_internal = source && source->starts_with(config_dir);
+            bool const is_internal = source.starts_with(config_dir);
             if (!is_internal) {
-                gtr_file_trash_or_remove(*source);
+                gtr_file_trash_or_remove(source);
             }
         }
     }
@@ -662,64 +660,59 @@ Glib::RefPtr<Torrent> Session::Impl::create_new_torrent(tr_ctor* ctor)
     return Torrent::create(tor);
 }
 
-void Session::Impl::add_ctor(tr_ctor* ctor, bool do_prompt, bool do_notify)
+void Session::Impl::add_builder(std::unique_ptr<tr_torrent_builder> builder, bool const do_prompt, bool const do_notify)
 {
-    auto const* metainfo = tr_ctorGetMetainfo(ctor);
-    if (metainfo == nullptr) {
+    auto const& metainfo = builder->metainfo();
+    if (std::empty(metainfo.info_hash_string())) {
         return;
     }
 
-    if (tr_torrentFindFromMetainfo(get_session(), metainfo) != nullptr) {
+    if (tr_torrentFindFromMetainfo(get_session(), &metainfo) != nullptr) {
         /* don't complain about torrent files in the watch directory
          * that have already been added... that gets annoying and we
          * don't want to be nagging users to clean up their watch dirs */
-        if (!tr_ctorGetSourceFile(ctor).has_value() || !adding_from_watch_dir_) {
-            signal_add_error_.emit(ERR_ADD_TORRENT_DUP, metainfo->name().c_str());
+        if (std::empty(builder->source_filename()) || !adding_from_watch_dir_) {
+            signal_add_error_.emit(ERR_ADD_TORRENT_DUP, metainfo.name().c_str());
         }
 
-        tr_ctorFree(ctor);
         return;
     }
 
     if (!do_prompt) {
-        add_torrent(create_new_torrent(ctor), do_notify);
-        tr_ctorFree(ctor);
+        add_torrent(create_new_torrent(builder.get()), do_notify);
         return;
     }
 
-    signal_add_prompt_.emit(ctor);
+    // the receiver wraps the pointer back up; see Application::Impl::on_add_torrent()
+    signal_add_prompt_.emit(builder.release());
 }
 
 namespace
 {
 
-void core_apply_defaults(tr_ctor* ctor)
+void core_apply_defaults(tr_torrent_builder* builder)
 {
-    if (!tr_ctorGetPaused(ctor, nullptr)) {
-        tr_ctorSetPaused(ctor, !gtr_pref_flag_get(TR_KEY_start_added_torrents));
+    if (!builder->paused()) {
+        builder->set_paused(!gtr_pref_flag_get(TR_KEY_start_added_torrents));
     }
 
-    if (!tr_ctorGetDeleteSource(ctor, nullptr)) {
-        tr_ctorSetDeleteSource(ctor, gtr_pref_flag_get(TR_KEY_trash_original_torrent_files));
+    if (!builder->peer_limit()) {
+        builder->set_peer_limit(gtr_pref_int_get<size_t>(TR_KEY_peer_limit_per_torrent));
     }
 
-    if (!tr_ctorGetPeerLimit(ctor, nullptr)) {
-        tr_ctorSetPeerLimit(ctor, gtr_pref_int_get<size_t>(TR_KEY_peer_limit_per_torrent));
-    }
-
-    if (!tr_ctorGetDownloadDir(ctor).has_value()) {
-        tr_ctorSetDownloadDir(ctor, gtr_pref_string_get(TR_KEY_download_dir));
+    if (std::empty(builder->download_dir())) {
+        builder->set_download_dir(gtr_pref_string_get(TR_KEY_download_dir));
     }
 }
 
 } // namespace
 
-void Session::add_ctor(tr_ctor* ctor)
+void Session::add_builder(std::unique_ptr<tr_torrent_builder> builder)
 {
     bool const do_notify = false;
     bool const do_prompt = gtr_pref_flag_get(TR_KEY_show_options_window);
-    core_apply_defaults(ctor);
-    impl_->add_ctor(ctor, do_prompt, do_notify);
+    core_apply_defaults(builder.get());
+    impl_->add_builder(std::move(builder), do_prompt, do_notify);
 }
 
 /***
@@ -729,9 +722,9 @@ void Session::add_ctor(tr_ctor* ctor)
 void Session::Impl::add_file_async_callback(
     Glib::RefPtr<Gio::File> const& file,
     Glib::RefPtr<Gio::AsyncResult>& result,
-    tr_ctor* ctor,
-    bool do_prompt,
-    bool do_notify)
+    std::unique_ptr<tr_torrent_builder> builder,
+    bool const do_prompt,
+    bool const do_notify)
 {
     try {
         gsize length = 0;
@@ -739,10 +732,8 @@ void Session::Impl::add_file_async_callback(
 
         if (!file->load_contents_finish(result, contents, length)) {
             gtr_message(fmt::format(fmt::runtime(_("Couldn't read '{path}'")), fmt::arg("path", file->get_parse_name())));
-        } else if (tr_ctorSetMetainfo(ctor, contents, length, nullptr)) {
-            add_ctor(ctor, do_prompt, do_notify);
-        } else {
-            tr_ctorFree(ctor);
+        } else if (builder->set_metainfo(contents != nullptr ? std::string_view{ contents, length } : std::string_view{})) {
+            add_builder(std::move(builder), do_prompt, do_notify);
         }
     } catch (Glib::Error const& e) {
         gtr_message(
@@ -774,34 +765,34 @@ bool Session::Impl::add(Glib::ustring const& name_in, bool const do_start, bool 
     }
 
     bool handled = false;
-    auto* ctor = tr_ctorNew(session);
-    core_apply_defaults(ctor);
-    tr_ctorSetPaused(ctor, !do_start);
+    auto builder = std::make_unique<tr_torrent_builder>(session);
+    core_apply_defaults(builder.get());
+    builder->set_paused(!do_start);
 
     bool loaded = false;
     auto file = Gio::File::create_for_parse_name(name);
     if (auto const path = file->get_path(); !std::empty(path)) {
         // try to treat it as a file...
-        loaded = tr_ctorSetMetainfoFromFile(ctor, path);
+        loaded = builder->set_metainfo_from_file(path);
     }
 
     if (!loaded) {
         // try to treat it as a magnet link...
-        loaded = tr_ctorSetMetainfoFromMagnetLink(ctor, name.raw(), nullptr);
+        loaded = builder->set_metainfo_from_magnet_link(name.raw());
     }
 
     // if we could make sense of it, add it
     if (loaded) {
         handled = true;
-        add_ctor(ctor, do_prompt, do_notify);
+        add_builder(std::move(builder), do_prompt, do_notify);
     } else if (tr_urlIsValid(file->get_uri())) {
         handled = true;
         inc_busy();
-        file->load_contents_async([this, file, ctor, do_prompt, do_notify](auto& result) {
-            add_file_async_callback(file, result, ctor, do_prompt, do_notify);
+        // released because the slot must be copyable; the callback re-owns it
+        file->load_contents_async([this, file, builder = builder.release(), do_prompt, do_notify](auto& result) {
+            add_file_async_callback(file, result, std::unique_ptr<tr_torrent_builder>{ builder }, do_prompt, do_notify);
         });
     } else {
-        tr_ctorFree(ctor);
         std::cerr << fmt::format(
                          fmt::runtime(_("Couldn't add torrent file '{path}'")),
                          fmt::arg("path", file->get_parse_name()))
@@ -876,15 +867,14 @@ void Session::Impl::remove_torrent(tr_torrent_id_t const id, bool const delete_f
 
 void Session::load(bool force_paused)
 {
-    auto* const ctor = tr_ctorNew(impl_->get_session());
+    auto builder = tr_torrent_builder{ impl_->get_session() };
 
     if (force_paused) {
-        tr_ctorSetPaused(ctor, true);
+        builder.set_paused(true);
     }
 
     auto* session = impl_->get_session();
-    tr_sessionLoadTorrents(session, ctor);
-    tr_ctorFree(ctor);
+    tr_sessionLoadTorrents(session, &builder);
 
     auto const raw_torrents = tr_sessionGetAllTorrents(session);
 
@@ -1243,7 +1233,7 @@ sigc::signal<void(Session::ErrorCode, Glib::ustring const&)>& Session::signal_ad
     return impl_->signal_add_error();
 }
 
-sigc::signal<void(tr_ctor*)>& Session::signal_add_prompt()
+sigc::signal<void(tr_torrent_builder*)>& Session::signal_add_prompt()
 {
     return impl_->signal_add_prompt();
 }

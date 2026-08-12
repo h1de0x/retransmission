@@ -101,9 +101,8 @@ public:
     /** @brief Add a torrent from a URL */
     bool add_from_url(Glib::ustring const& url);
 
-    /** @brief Add a torrent.
-        @param ctor this function assumes ownership of the ctor */
-    void add_ctor(tr_ctor* ctor);
+    /** @brief Add a torrent. */
+    void add_builder(std::unique_ptr<tr_torrent_builder> builder);
 
     /** Add a torrent. */
     void add_torrent(Glib::RefPtr<Torrent> const& torrent, bool do_notify);
@@ -180,7 +179,7 @@ public:
     void open_folder(tr_torrent_id_t torrent_id) const;
 
     sigc::signal<void(ErrorCode, Glib::ustring const&)>& signal_add_error();
-    sigc::signal<void(tr_ctor*)>& signal_add_prompt();
+    sigc::signal<void(tr_torrent_builder*)>& signal_add_prompt();
     sigc::signal<void(bool)>& signal_blocklist_updated();
     sigc::signal<void(bool)>& signal_busy();
     sigc::signal<void(tr_quark)>& signal_prefs_changed();

@@ -13,6 +13,7 @@
 
 #include <libtransmission/error.h>
 #include <libtransmission/makemeta.h>
+#include <libtransmission/torrent-builder.h>
 #include <libtransmission/transmission.h>
 #include <libtransmission/values.h>
 
@@ -241,10 +242,10 @@ MakeProgressDialog::~MakeProgressDialog()
 
 void MakeProgressDialog::addTorrent()
 {
-    tr_ctor* ctor = tr_ctorNew(core_->get_session());
-    tr_ctorSetMetainfoFromFile(ctor, target_);
-    tr_ctorSetDownloadDir(ctor, Glib::path_get_dirname(builder_.top()));
-    core_->add_ctor(ctor);
+    auto torrent_builder = std::make_unique<tr_torrent_builder>(core_->get_session());
+    torrent_builder->set_metainfo_from_file(target_);
+    torrent_builder->set_download_dir(Glib::path_get_dirname(builder_.top()));
+    core_->add_builder(std::move(torrent_builder));
 }
 
 void MakeProgressDialog::onProgressDialogResponse(int response)

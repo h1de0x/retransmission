@@ -31,7 +31,7 @@
 #include <libtransmission/file.h> // tr_sys_file_*()
 #include <libtransmission/macros.h>
 #include <libtransmission/quark.h>
-#include <libtransmission/torrent-ctor.h>
+#include <libtransmission/torrent-builder.h>
 #include <libtransmission/torrent.h>
 #include <libtransmission/tr-strbuf.h>
 #include <libtransmission/variant.h>
@@ -331,12 +331,12 @@ private:
 protected:
     enum class ZeroTorrentState : uint8_t { NoFiles, Partial, Complete };
 
-    [[nodiscard]] tr_torrent* createTorrentAndWaitForVerifyDone(tr_ctor* ctor)
+    [[nodiscard]] tr_torrent* createTorrentAndWaitForVerifyDone(tr_torrent_builder* builder)
     {
         auto verified_lock = std::unique_lock(verified_mutex_);
         auto const n_previously_verified = std::size(verified_);
 
-        auto* const tor = tr_torrentNew(ctor, nullptr);
+        auto* const tor = tr_torrentNew(builder, nullptr);
         EXPECT_NE(nullptr, tor);
         if (tor == nullptr) {
             return nullptr;
@@ -374,18 +374,18 @@ protected:
             "SbRhMVL9e9umo/8KT9ZCS1GIQxhJtGExUv1726aj/wpP1kJLOlf5A+Tz30nMBVuNM2hpV3wg/103"
             "OnByaXZhdGVpMGVlZQ==";
 
-        // create the torrent ctor
+        // create the torrent builder
         auto const benc = tr_base64_decode(BencBase64);
         EXPECT_LT(0U, std::size(benc));
-        auto* ctor = tr_ctorNew(session_);
+        auto builder = tr_torrent_builder{ session_ };
         auto error = tr_error{};
-        EXPECT_TRUE(tr_ctorSetMetainfo(ctor, std::data(benc), std::size(benc), &error));
+        EXPECT_TRUE(builder.set_metainfo(std::string_view{ std::data(benc), std::size(benc) }, &error));
         EXPECT_FALSE(error) << error;
-        tr_ctorSetPaused(ctor, true);
+        builder.set_paused(true);
 
         // maybe create the files
         if (state != ZeroTorrentState::NoFiles) {
-            auto const* const metainfo = tr_ctorGetMetainfo(ctor);
+            auto const* const metainfo = &builder.metainfo();
             for (tr_file_index_t i = 0, n = metainfo->file_count(); i < n; ++i) {
                 auto const base = state == ZeroTorrentState::Partial && tr_sessionIsIncompleteDirEnabled(session_) ?
                     tr_sessionGetIncompleteDir(session_) :
@@ -416,35 +416,30 @@ protected:
             }
         }
 
-        auto* const tor = createTorrentAndWaitForVerifyDone(ctor);
-        tr_ctorFree(ctor);
-        return tor;
+        return createTorrentAndWaitForVerifyDone(&builder);
     }
 
     [[nodiscard]] tr_torrent* zeroTorrentMagnetInit()
     {
         static auto constexpr V1Hash = "fa5794674a18241bec985ddc3390e3cb171345e4";
 
-        auto ctor = tr_ctorNew(session_);
-        ctor->set_metainfo_from_magnet_link(V1Hash);
-        tr_ctorSetPaused(ctor, true);
+        auto builder = tr_torrent_builder{ session_ };
+        builder.set_metainfo_from_magnet_link(V1Hash);
+        builder.set_paused(true);
 
-        auto* const tor = tr_torrentNew(ctor, nullptr);
+        auto* const tor = tr_torrentNew(&builder, nullptr);
         EXPECT_NE(nullptr, tor);
-        tr_ctorFree(ctor);
         return tor;
     }
 
     [[nodiscard]] tr_torrent* torrentInitFromFile(std::string_view filename)
     {
-        auto* const ctor = tr_ctorNew(session_);
+        auto builder = tr_torrent_builder{ session_ };
 
         auto const path = tr_pathbuf{ LIBTRANSMISSION_TEST_ASSETS_DIR, '/', filename };
-        EXPECT_TRUE(ctor->set_metainfo_from_file(path));
+        EXPECT_TRUE(builder.set_metainfo_from_file(path));
 
-        auto* const tor = createTorrentAndWaitForVerifyDone(ctor);
-        tr_ctorFree(ctor);
-        return tor;
+        return createTorrentAndWaitForVerifyDone(&builder);
     }
 
     void blockingTorrentVerify(tr_torrent* tor)
