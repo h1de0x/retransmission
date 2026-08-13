@@ -2,6 +2,8 @@
 // It may be used under the MIT (SPDX: MIT) license.
 // License text can be found in the licenses/ folder.
 
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+
 #import "BaseFileNameCellView.h"
 #import "FileListNode.h"
 #import "Torrent.h"
@@ -19,10 +21,31 @@ static CGFloat const kPaddingBetweenNameAndFolderStatus = 4.0;
 @property(nonatomic, weak) NSImageView* iconView;
 @property(nonatomic, weak) NSTextField* nameField;
 @property(nonatomic, weak) NSTextField* statusField;
-@property(nonatomic, strong) NSArray<NSLayoutConstraint*>* dynamicConstraints;
 @end
 
+static NSCache<UTType*, NSImage*>* iconCache;
+
 @implementation BaseFileNameCellView
+
++ (void)initialize
+{
+    if (self == [BaseFileNameCellView class]) {
+        iconCache = [[NSCache alloc] init];
+    }
+}
+
++ (NSImage*)cachedIconForUTType:(UTType*)uttype
+{
+    auto cachedIcon = [iconCache objectForKey:uttype];
+
+    if (cachedIcon == nil) {
+        auto icon = [NSWorkspace.sharedWorkspace iconForContentType:uttype];
+        [iconCache setObject:icon forKey:uttype];
+        return icon;
+    }
+
+    return cachedIcon;
+}
 
 - (instancetype)initWithFrame:(NSRect)frameRect
 {
@@ -70,6 +93,10 @@ static CGFloat const kPaddingBetweenNameAndFolderStatus = 4.0;
 {
 }
 
+- (void)updateImage
+{
+}
+
 - (void)setNode:(FileListNode*)node
 {
     _node = node;
@@ -85,7 +112,7 @@ static CGFloat const kPaddingBetweenNameAndFolderStatus = 4.0;
     FileListNode* node = self.node;
 
     // Update icon
-    self.iconView.image = node.icon;
+    [self updateImage];
 
     // Update name
     self.nameField.stringValue = node.name;
@@ -154,6 +181,26 @@ static CGFloat const kPaddingBetweenNameAndFolderStatus = 4.0;
 
 @implementation FileNameCellView
 
+- (void)updateImage
+{
+    NSString* const name = self.node.name;
+
+    if (name == nil) {
+        return;
+    }
+
+    // typeWithFilenameExtension: returns nil when the name carries no extension
+    // ("README", ".gitignore"), so fall back to the generic item icon.
+    auto uttype = [UTType typeWithFilenameExtension:name.pathExtension] ?: UTTypeItem;
+
+    // cachedIconForUTType: returns one shared instance per type, so this
+    // compares identity rather than contents.
+    auto image = [self.class cachedIconForUTType:uttype];
+    if (self.iconView.image != image) {
+        self.iconView.image = image;
+    }
+}
+
 - (void)setupConstraints
 {
     NSImageView* iconView = self.iconView;
@@ -184,6 +231,14 @@ static CGFloat const kPaddingBetweenNameAndFolderStatus = 4.0;
 @end
 
 @implementation FolderNameCellView
+
+- (instancetype)initWithFrame:(NSRect)frameRect
+{
+    if (self = [super initWithFrame:frameRect]) {
+        self.iconView.image = [self.class cachedIconForUTType:UTTypeFolder];
+    }
+    return self;
+}
 
 - (void)setupConstraints
 {
