@@ -230,7 +230,18 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
                 torrentCell.fRevealButton.hidden = YES;
             }
         } else {
-            torrentCell = [outlineView makeViewWithIdentifier:@"TorrentCell" owner:self];
+            // TODO(lolgear): Remove torrent cell from xib.
+            torrentCell = [outlineView makeViewWithIdentifier:@"NewTorrentCell" owner:self];
+            if (!torrentCell) {
+                torrentCell = [[TorrentCell alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(outlineView.bounds), self.rowHeight)];
+                torrentCell.identifier = @"NewTorrentCell";
+                [torrentCell layoutSubtreeIfNeeded];
+            }
+
+            ((TorrentCellControlButton*)torrentCell.fControlButton).torrentCell = torrentCell;
+            ((TorrentCellRevealButton*)torrentCell.fRevealButton).torrentCell = torrentCell;
+            ((TorrentCellActionButton*)torrentCell.fActionButton).torrentCell = torrentCell;
+
             torrentCell.fTorrentProgressField.stringValue = torrent.progressString;
 
             // set torrent icon and error badge
