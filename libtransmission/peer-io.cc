@@ -176,6 +176,7 @@ void tr_peerIo::set_socket(std::shared_ptr<tr_peer_socket> socket_in)
     close(); // tear down the previous socket, if any
 
     socket_ = std::move(socket_in);
+    fatal_error_seen_ = false;
     socket_address_ = socket_->socket_address();
 
     socket_->set_read_cb([weak = weak_from_this()] {
@@ -276,7 +277,7 @@ size_t tr_peerIo::try_write(size_t max)
 {
     static auto constexpr Dir = tr_direction::Up;
 
-    if (max == 0U) {
+    if (max == 0U || fatal_error_seen_) {
         return {};
     }
 
@@ -325,7 +326,7 @@ void tr_peerIo::can_read_wrapper(size_t bytes_transferred)
 {
     // try to consume the input buffer
 
-    if (can_read_ == nullptr) {
+    if (can_read_ == nullptr || fatal_error_seen_) {
         return;
     }
 
@@ -371,7 +372,7 @@ size_t tr_peerIo::try_read(size_t max)
 {
     static auto constexpr Dir = tr_direction::Down;
 
-    if (max == 0U) {
+    if (max == 0U || fatal_error_seen_) {
         return {};
     }
 
@@ -424,9 +425,9 @@ void tr_peerIo::set_enabled(tr_direction dir, bool is_enabled)
     }
 
     if (dir == tr_direction::Up) {
-        socket_->set_write_enabled(is_enabled);
+        socket_->set_write_enabled(is_enabled && !fatal_error_seen_);
     } else {
-        socket_->set_read_enabled(is_enabled);
+        socket_->set_read_enabled(is_enabled && !fatal_error_seen_);
     }
 }
 

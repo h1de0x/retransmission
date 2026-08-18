@@ -144,6 +144,10 @@ public:
 
     size_t flush(tr_direction dir, size_t byte_limit)
     {
+        if (fatal_error_seen_) {
+            return {};
+        }
+
         return dir == tr_direction::Down ? try_read(byte_limit) : try_write(byte_limit);
     }
 
@@ -313,6 +317,13 @@ private:
 
     void call_error_callback(tr_error const& error)
     {
+        // Peer removal is asynchronous. Until it happens, the bandwidth allocator
+        // can try to flush this I/O again, so report only the first fatal error.
+        if (fatal_error_seen_) {
+            return;
+        }
+
+        fatal_error_seen_ = true;
         if (got_error_ != nullptr) {
             got_error_(this, error, user_data_);
         }
@@ -368,6 +379,7 @@ private:
     bool const client_is_seed_;
     bool const is_incoming_;
 
+    bool fatal_error_seen_ = false;
     bool dht_supported_ = false;
     bool extended_protocol_supported_ = false;
     bool fast_extension_supported_ = false;
