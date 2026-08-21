@@ -47,8 +47,8 @@ public:
     void set_has_none() noexcept;
 
     // set one or more bits
-    void set(size_t nth, bool value = true);
-    void set_span(size_t begin, size_t end, bool value = true);
+    bool set(size_t nth, bool value = true);
+    bool set_span(size_t begin, size_t end, bool value = true);
     void unset(size_t bit)
     {
         set(bit, false);
@@ -57,19 +57,19 @@ public:
     {
         set_span(begin, end, false);
     }
-    void set_from_bools(std::span<bool const> flags);
+    [[nodiscard]] bool set_from_bools(std::span<bool const> flags);
 
     // "raw" here is in BEP0003 format: "The first byte of the bitfield
     // corresponds to indices 0 - 7 from high bit to low bit, respectively.
     // The next one 8-15, etc. Spare bits at the end are set to zero."
-    void set_raw(std::span<std::byte const> raw);
+    bool set_raw(std::span<std::byte const> raw);
     [[nodiscard]] std::vector<std::byte> raw() const;
 
     template<typename R>
         requires(!requires(R const& range) { std::span<std::byte const>{ range }; })
-    void set_raw(R const& raw)
+    bool set_raw(R const& raw)
     {
-        set_raw(std::as_bytes(std::span<typename R::value_type const>{ raw }));
+        return set_raw(std::as_bytes(std::span<typename R::value_type const>{ raw }));
     }
 
     [[nodiscard]] constexpr bool has_all() const noexcept
@@ -99,9 +99,9 @@ public:
         return bit_count_;
     }
 
-    [[nodiscard]] constexpr bool empty() const noexcept
+    [[nodiscard]] constexpr bool is_size_known() const noexcept
     {
-        return size() == 0;
+        return size() != 0;
     }
 
     [[nodiscard]] bool is_valid() const;
@@ -112,7 +112,7 @@ public:
             return 1.0F;
         }
 
-        if (has_none() || empty()) {
+        if (has_none() || !is_size_known()) {
             return 0.0F;
         }
 
@@ -120,8 +120,6 @@ public:
     }
 
     tr_bitfield& operator|=(tr_bitfield const& that);
-    tr_bitfield& operator&=(tr_bitfield const& that);
-    [[nodiscard]] bool intersects(tr_bitfield const& that) const noexcept;
 
 private:
     [[nodiscard]] TR_CONSTEXPR_VEC size_t count_flags() const noexcept
@@ -132,7 +130,6 @@ private:
         }
         return ret;
     }
-    [[nodiscard]] size_t count_flags(size_t begin, size_t end) const noexcept;
 
     [[nodiscard]] constexpr bool test_flag(size_t n) const
     {
@@ -143,7 +140,7 @@ private:
         return (flags_[n >> 3U] << (n & 7U) & std::byte{ 0x80 }) != std::byte{};
     }
 
-    void ensure_bits_alloced(size_t n);
+    [[nodiscard]] bool ensure_bits_alloced(size_t n);
     [[nodiscard]] bool ensure_nth_bit_alloced(size_t nth);
 
     void free_array() noexcept
@@ -170,8 +167,8 @@ private:
     size_t bit_count_ = 0;
     size_t true_count_ = 0;
 
-    /* Special cases for when full or empty but we don't know the bitCount.
+    /* Special cases for when full or empty but we don't know the bit_count_.
        This occurs when a magnet link's peers send have all / have none */
     bool have_all_hint_ = false;
-    bool have_none_hint_ = false;
+    bool have_none_hint_ = true;
 };
