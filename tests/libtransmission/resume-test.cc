@@ -153,6 +153,10 @@ protected:
         builder.set_paused(true);
         EXPECT_TRUE(builder.set_metainfo(benc));
 
+        // Model an existing torrent with resume data. Save the metainfo first
+        // so tr_torrentNew() does not start background verification.
+        EXPECT_TRUE(builder.save(builder.metainfo().torrent_file(session_->torrentDir())));
+
         auto serde = tr_variant_serde::benc();
         auto const filename = builder.metainfo().resume_file(session_->resumeDir());
         EXPECT_TRUE(serde.to_file(tr_variant{ std::move(resume) }, filename)) << serde.error_;
