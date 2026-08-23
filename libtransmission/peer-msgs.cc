@@ -48,6 +48,7 @@
 #include "libtransmission/tr-assert.h"
 #include "libtransmission/tr-buffer.h"
 #include "libtransmission/types.h"
+#include "libtransmission/utils.h"
 #include "libtransmission/variant.h"
 #include "libtransmission/version.h"
 
@@ -384,6 +385,34 @@ public:
         // A peer may not be interesting to us anymore after
         // sending us metadata, so do a status update
         update_active();
+
+        TR_ASSERT(tor_.has_metainfo());
+
+        // Torrent piece count was not known before this point,
+        // and this sets the bitfield size to the piece count.
+        if (!have_.init_size(tor_.piece_count())) {
+            auto const peer_bitfield_bytes = tr_bytes_needed(have_.size());
+            auto const actual_bitfield_bytes = tr_bytes_needed(tor_.piece_count());
+            if (peer_bitfield_bytes != actual_bitfield_bytes) {
+                logdbg(
+                    this,
+                    fmt::format(
+                        "peer sent bitfield with {} bytes, but a valid bitfield should take {} bytes, disconnecting",
+                        peer_bitfield_bytes,
+                        actual_bitfield_bytes));
+                disconnect_soon();
+                return;
+            }
+
+            [[maybe_unused]] auto const shrink_to_res = have_.shrink_to(tor_.piece_count());
+            TR_ASSERT(shrink_to_res);
+        }
+
+        // Neither init_size() nor shrink_to() can turn "have all" off, so writing
+        // `false` here could only discard what an earlier connection told us.
+        if (is_seed()) {
+            peer_info->set_seed();
+        }
     }
 
     void cancel_block_request(tr_block_index_t block)
@@ -747,7 +776,7 @@ private:
         return len == 5U;
 
     case BtPeerMsgs::Bitfield:
-        return !tor.has_metainfo() || len == 1 + ((tor.piece_count() + 7U) / 8U);
+        return !tor.has_metainfo() || len == 1 + tr_bytes_needed(tor.piece_count());
 
     case BtPeerMsgs::Request:
     case BtPeerMsgs::Cancel:
