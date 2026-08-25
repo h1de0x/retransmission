@@ -141,10 +141,10 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
         if (![rowItem isKindOfClass:[TorrentGroup class]]) {
             if (minimal) {
                 SmallTorrentCell* smallCell = [self viewAtColumn:0 row:row makeIfNecessary:NO];
-                [(TorrentCellControlButton*)smallCell.fControlButton resetImage];
+                [smallCell.fControlButton resetImage];
             } else {
                 TorrentCell* torrentCell = [self viewAtColumn:0 row:row makeIfNecessary:NO];
-                [(TorrentCellControlButton*)torrentCell.fControlButton resetImage];
+                [torrentCell.fControlButton resetImage];
             }
         }
     }];
@@ -205,17 +205,12 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
 
         TorrentCell* torrentCell;
         if (minimal) {
-            // TODO(lolgear): Remove small torrent cell from xib.
-            torrentCell = [outlineView makeViewWithIdentifier:@"NewSmallTorrentCell" owner:self];
+            torrentCell = [outlineView makeViewWithIdentifier:@"SmallTorrentCell" owner:self];
             if (!torrentCell) {
                 torrentCell = [[SmallTorrentCell alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(outlineView.bounds), self.rowHeight)];
-                torrentCell.identifier = @"NewSmallTorrentCell";
+                torrentCell.identifier = @"SmallTorrentCell";
                 [torrentCell layoutSubtreeIfNeeded];
             }
-
-            ((TorrentCellControlButton*)torrentCell.fControlButton).torrentCell = torrentCell;
-            ((TorrentCellRevealButton*)torrentCell.fRevealButton).torrentCell = torrentCell;
-            ((TorrentCellActionButton*)torrentCell.fActionButton).torrentCell = torrentCell;
 
             // set torrent icon or error badge
             torrentCell.fIconView.image = error ? [NSImage imageNamed:NSImageNameCaution] : torrent.icon;
@@ -240,17 +235,12 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
                 torrentCell.fRevealButton.hidden = YES;
             }
         } else {
-            // TODO(lolgear): Remove torrent cell from xib.
-            torrentCell = [outlineView makeViewWithIdentifier:@"NewTorrentCell" owner:self];
+            torrentCell = [outlineView makeViewWithIdentifier:@"TorrentCell" owner:self];
             if (!torrentCell) {
                 torrentCell = [[TorrentCell alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(outlineView.bounds), self.rowHeight)];
-                torrentCell.identifier = @"NewTorrentCell";
+                torrentCell.identifier = @"TorrentCell";
                 [torrentCell layoutSubtreeIfNeeded];
             }
-
-            ((TorrentCellControlButton*)torrentCell.fControlButton).torrentCell = torrentCell;
-            ((TorrentCellRevealButton*)torrentCell.fRevealButton).torrentCell = torrentCell;
-            ((TorrentCellActionButton*)torrentCell.fActionButton).torrentCell = torrentCell;
 
             torrentCell.fTorrentProgressField.stringValue = torrent.progressString;
 
@@ -258,7 +248,7 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
             NSImage* fileImage = torrent.icon;
             if (error) {
                 NSRect frame = torrentCell.fIconView.frame;
-                NSImage* resultImage = [[NSImage alloc] initWithSize:NSMakeSize(frame.size.height, frame.size.width)];
+                NSImage* resultImage = [[NSImage alloc] initWithSize:frame.size];
                 [resultImage lockFocus];
 
                 // draw fileImage
@@ -321,11 +311,10 @@ static NSTimeInterval const kToggleProgressSeconds = 0.175;
         return torrentCell;
     } else {
         TorrentGroup* group = (TorrentGroup*)item;
-        // TODO(lolgear): Remove group cell from xib.
-        GroupCell* groupCell = [outlineView makeViewWithIdentifier:@"NewGroupCell" owner:self];
+        GroupCell* groupCell = [outlineView makeViewWithIdentifier:@"GroupCell" owner:self];
         if (!groupCell) {
             groupCell = [[GroupCell alloc] initWithFrame:NSZeroRect];
-            groupCell.identifier = @"NewGroupCell";
+            groupCell.identifier = @"GroupCell";
         }
 
         NSInteger groupIndex = group.groupIndex;

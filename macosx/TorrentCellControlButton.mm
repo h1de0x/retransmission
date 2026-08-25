@@ -20,14 +20,6 @@
     return self.torrentCell.fTorrentTableView;
 }
 
-- (void)awakeFromNib
-{
-    [super awakeFromNib];
-
-    self.controlImageSuffix = @"Off";
-    [self updateImage];
-}
-
 - (instancetype)initWithFrame:(NSRect)frameRect
 {
     if (self = [super initWithFrame:frameRect]) {

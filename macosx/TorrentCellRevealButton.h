@@ -6,5 +6,5 @@
 
 @class TorrentCell;
 @interface TorrentCellRevealButton : NSButton
-@property(nonatomic, weak) IBOutlet TorrentCell* torrentCell;
+@property(nonatomic, weak) TorrentCell* torrentCell;
 @end

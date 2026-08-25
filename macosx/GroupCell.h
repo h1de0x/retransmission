@@ -7,12 +7,12 @@
 
 @interface GroupCell : NSTableCellView
 
-@property(nonatomic) IBOutlet NSImageView* fGroupIndicatorView;
-@property(nonatomic) IBOutlet NSTextField* fGroupTitleField;
+@property(nonatomic) NSImageView* fGroupIndicatorView;
+@property(nonatomic) NSTextField* fGroupTitleField;
 
-@property(nonatomic) IBOutlet NSImageView* fGroupDownloadView;
-@property(nonatomic) IBOutlet NSImageView* fGroupUploadAndRatioView;
-@property(nonatomic) IBOutlet NSTextField* fGroupDownloadField;
-@property(nonatomic) IBOutlet NSTextField* fGroupUploadAndRatioField;
+@property(nonatomic) NSImageView* fGroupDownloadView;
+@property(nonatomic) NSImageView* fGroupUploadAndRatioView;
+@property(nonatomic) NSTextField* fGroupDownloadField;
+@property(nonatomic) NSTextField* fGroupUploadAndRatioField;
 
 @end

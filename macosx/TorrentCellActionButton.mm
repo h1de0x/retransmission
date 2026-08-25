@@ -22,20 +22,6 @@
     return self.torrentCell.fTorrentTableView;
 }
 
-- (void)awakeFromNib
-{
-    [super awakeFromNib];
-    self.fDefaults = NSUserDefaults.standardUserDefaults;
-    self.fImage = self.image;
-
-    // hide image by default and show only on hover
-    self.fAlternativeImage = [[NSImage alloc] init];
-    self.image = self.fAlternativeImage;
-
-    // disable button click highlighting
-    [self.cell setHighlightsBy:NSNoCellMask];
-}
-
 - (instancetype)initWithFrame:(NSRect)frameRect
 {
     if (self = [super initWithFrame:frameRect]) {

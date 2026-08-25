@@ -19,14 +19,6 @@
     return self.torrentCell.fTorrentTableView;
 }
 
-- (void)awakeFromNib
-{
-    [super awakeFromNib];
-
-    self.revealImageString = @"RevealOff";
-    [self updateImage];
-}
-
 - (instancetype)initWithFrame:(NSRect)frameRect
 {
     if (self = [super initWithFrame:frameRect]) {

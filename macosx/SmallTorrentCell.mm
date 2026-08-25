@@ -6,7 +6,32 @@
 #import "ProgressBarView.h"
 #import "ProgressGradients.h"
 #import "TorrentTableView.h"
-#import "Torrent.h"
+#import "TorrentCellControlButton.h"
+#import "TorrentCellActionButton.h"
+#import "TorrentCellRevealButton.h"
+
+// Layout Constants
+// Considerations:
+// Suffix _Size -> Size ( width x height )
+// Suffix _Spacing -> Spacing between two elements inside container (most of them are in `self` view (torrent cell)).
+// Suffix _Offset -> Offset to container (spacing between this view border and container border).
+// Leading edge (group, icon, action button)
+static CGFloat const kGroupIndicatorSize = 6.0;
+static CGFloat const kGroupIndicatorToIconSpacing = 8.0;
+static CGFloat const kIconSize = 16.0;
+static CGFloat const kActionButtonSize = 16.0;
+static CGFloat const kIconToProgressBarSpacing = 15.0;
+
+// Middle items (progress bar, title, priority labels)
+static CGFloat const kPriorityViewSize = 12.0;
+static CGFloat const kProgressBarHeight = 18.0;
+static CGFloat const kProgressBarTrailingOffset = -5.0; // inverted for constraints.
+
+// Trailing edge (control button, reveal button, status field)
+static CGFloat const kStackViewToStatusFieldSpacing = 4.0;
+static CGFloat const kTrailingOffset = -3.0; // inverted for constraints.
+static CGFloat const kButtonSize = 14.0;
+static CGFloat const kButtonsSpacing = 3.0;
 
 @interface SmallTorrentCell ()
 @property(nonatomic) NSTrackingArea* fTrackingArea;
@@ -77,30 +102,30 @@
         // groupIndicatorView
         [groupIndicatorView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
         [groupIndicatorView.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-        [groupIndicatorView.widthAnchor constraintEqualToConstant:6],
-        [groupIndicatorView.heightAnchor constraintEqualToConstant:6],
+        [groupIndicatorView.widthAnchor constraintEqualToConstant:kGroupIndicatorSize],
+        [groupIndicatorView.heightAnchor constraintEqualToConstant:kGroupIndicatorSize],
 
         // iconView
-        [iconView.leadingAnchor constraintEqualToAnchor:groupIndicatorView.trailingAnchor constant:8],
+        [iconView.leadingAnchor constraintEqualToAnchor:groupIndicatorView.trailingAnchor constant:kGroupIndicatorToIconSpacing],
         [iconView.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-        [iconView.widthAnchor constraintEqualToConstant:16],
-        [iconView.heightAnchor constraintEqualToConstant:16],
+        [iconView.widthAnchor constraintEqualToConstant:kIconSize],
+        [iconView.heightAnchor constraintEqualToConstant:kIconSize],
 
         // actionButton
         [actionButton.centerXAnchor constraintEqualToAnchor:iconView.centerXAnchor],
         [actionButton.centerYAnchor constraintEqualToAnchor:iconView.centerYAnchor],
-        [actionButton.widthAnchor constraintEqualToConstant:16],
-        [actionButton.heightAnchor constraintEqualToConstant:16],
+        [actionButton.widthAnchor constraintEqualToConstant:kActionButtonSize],
+        [actionButton.heightAnchor constraintEqualToConstant:kActionButtonSize],
 
         // torrentProgressBarView
-        [torrentProgressBarView.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:15],
-        [torrentProgressBarView.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-5],
+        [torrentProgressBarView.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:kIconToProgressBarSpacing],
+        [torrentProgressBarView.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:kProgressBarTrailingOffset],
         [torrentProgressBarView.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-        [torrentProgressBarView.heightAnchor constraintEqualToConstant:18],
+        [torrentProgressBarView.heightAnchor constraintEqualToConstant:kProgressBarHeight],
 
         // torrentPriorityView
-        [torrentPriorityView.heightAnchor constraintEqualToConstant:12],
-        [torrentPriorityView.widthAnchor constraintEqualToConstant:12],
+        [torrentPriorityView.heightAnchor constraintEqualToConstant:kPriorityViewSize],
+        [torrentPriorityView.widthAnchor constraintEqualToConstant:kPriorityViewSize],
 
         // stackView
         [stackView.leadingAnchor constraintEqualToAnchor:torrentProgressBarView.leadingAnchor],
@@ -108,21 +133,21 @@
         [stackView.bottomAnchor constraintEqualToAnchor:torrentProgressBarView.bottomAnchor],
 
         // torrentStatusField
-        [torrentStatusField.leadingAnchor constraintEqualToAnchor:stackView.trailingAnchor constant:4],
-        [torrentStatusField.trailingAnchor constraintEqualToAnchor:torrentProgressBarView.trailingAnchor constant:-3],
+        [torrentStatusField.leadingAnchor constraintEqualToAnchor:stackView.trailingAnchor constant:kStackViewToStatusFieldSpacing],
+        [torrentStatusField.trailingAnchor constraintEqualToAnchor:torrentProgressBarView.trailingAnchor constant:kTrailingOffset],
         [torrentStatusField.centerYAnchor constraintEqualToAnchor:torrentProgressBarView.centerYAnchor],
 
         // controlButton
         [controlButton.centerYAnchor constraintEqualToAnchor:torrentProgressBarView.centerYAnchor],
-        [controlButton.widthAnchor constraintEqualToConstant:14],
-        [controlButton.heightAnchor constraintEqualToConstant:14],
+        [controlButton.widthAnchor constraintEqualToConstant:kButtonSize],
+        [controlButton.heightAnchor constraintEqualToConstant:kButtonSize],
 
         // revealButton
-        [revealButton.leadingAnchor constraintEqualToAnchor:controlButton.trailingAnchor constant:3],
-        [revealButton.trailingAnchor constraintEqualToAnchor:torrentProgressBarView.trailingAnchor constant:-3],
+        [revealButton.leadingAnchor constraintEqualToAnchor:controlButton.trailingAnchor constant:kButtonsSpacing],
+        [revealButton.trailingAnchor constraintEqualToAnchor:torrentProgressBarView.trailingAnchor constant:kTrailingOffset],
         [revealButton.centerYAnchor constraintEqualToAnchor:controlButton.centerYAnchor],
-        [revealButton.widthAnchor constraintEqualToConstant:14],
-        [revealButton.heightAnchor constraintEqualToConstant:14],
+        [revealButton.widthAnchor constraintEqualToConstant:kButtonSize],
+        [revealButton.heightAnchor constraintEqualToConstant:kButtonSize],
     ]];
 }
 

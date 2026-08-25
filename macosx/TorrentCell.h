@@ -3,26 +3,28 @@
 // License text can be found in the licenses/ folder.
 
 #import <AppKit/AppKit.h>
-#import "TorrentTableView.h"
 
+@class TorrentTableView;
+@class TorrentCellActionButton;
+@class TorrentCellControlButton;
+@class TorrentCellRevealButton;
 @interface TorrentCell : NSTableCellView
 
-@property(nonatomic) IBOutlet NSButton* fActionButton;
-@property(nonatomic) IBOutlet NSButton* fControlButton;
-@property(nonatomic) IBOutlet NSButton* fRevealButton;
+@property(nonatomic) TorrentCellActionButton* fActionButton;
+@property(nonatomic) TorrentCellControlButton* fControlButton;
+@property(nonatomic) TorrentCellRevealButton* fRevealButton;
 
-@property(nonatomic) IBOutlet NSImageView* fIconView;
-@property(nonatomic) IBOutlet NSImageView* fGroupIndicatorView;
+@property(nonatomic) NSImageView* fIconView;
+@property(nonatomic) NSImageView* fGroupIndicatorView;
 
-@property(nonatomic) IBOutlet NSStackView* fStackView;
-@property(nonatomic) IBOutlet NSTextField* fTorrentTitleField;
-@property(nonatomic) IBOutlet NSImageView* fTorrentPriorityView;
-@property(nonatomic) IBOutlet NSLayoutConstraint* fTorrentPriorityViewWidthConstraint;
+@property(nonatomic) NSStackView* fStackView;
+@property(nonatomic) NSTextField* fTorrentTitleField;
+@property(nonatomic) NSImageView* fTorrentPriorityView;
 
-@property(nonatomic) IBOutlet NSTextField* fTorrentProgressField;
-@property(nonatomic) IBOutlet NSTextField* fTorrentStatusField;
+@property(nonatomic) NSTextField* fTorrentProgressField;
+@property(nonatomic) NSTextField* fTorrentStatusField;
 
-@property(nonatomic) IBOutlet NSView* fTorrentProgressBarView;
+@property(nonatomic) NSView* fTorrentProgressBarView;
 
 @property(nonatomic, weak) TorrentTableView* fTorrentTableView;
 
