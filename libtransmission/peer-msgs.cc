@@ -170,6 +170,9 @@ auto constexpr Reject = 2;
 
 } // namespace MetadataMsgType
 
+// Arbitrary upper size limit to avoid memory exhaustion attacks.
+auto constexpr MaxIncomingMsgBytes = size_t{ 4U * 1024U * 1024U };
+
 auto constexpr MinChokePeriodSec = time_t{ 10 };
 
 // idle seconds before we send a keepalive
@@ -644,6 +647,9 @@ private:
 
     tr_error_code_t client_got_block(std::span<uint8_t const> block_data, tr_block_index_t block);
     ReadResult read_piece_data(MessageReader& payload);
+
+    // Precondition: `payload` is a complete message body whose length
+    // can_read_impl() has already accepted for `id`.
     ReadResult process_peer_message(uint8_t id, MessageReader& payload);
 
     // ---
@@ -759,7 +765,7 @@ private:
 
 // ---
 
-[[nodiscard]] constexpr bool is_message_length_correct(tr_torrent const& tor, uint8_t id, uint32_t len)
+[[nodiscard]] constexpr bool is_message_length_correct(tr_torrent const& tor, uint8_t const id, uint32_t const len) noexcept
 {
     switch (id) {
     case BtPeerMsgs::Choke:
@@ -768,34 +774,48 @@ private:
     case BtPeerMsgs::NotInterested:
     case BtPeerMsgs::FextHaveAll:
     case BtPeerMsgs::FextHaveNone:
-        return len == 1U;
+        return len == sizeof(id);
 
     case BtPeerMsgs::Have:
     case BtPeerMsgs::FextSuggest:
     case BtPeerMsgs::FextAllowedFast:
-        return len == 5U;
+        return len == sizeof(id) + sizeof(uint32_t /*piece*/);
 
     case BtPeerMsgs::Bitfield:
-        return !tor.has_metainfo() || len == 1 + tr_bytes_needed(tor.piece_count());
+        if (tor.has_metainfo()) {
+            return len == sizeof(id) + tr_bytes_needed(tor.piece_count());
+        }
+        break;
 
     case BtPeerMsgs::Request:
     case BtPeerMsgs::Cancel:
     case BtPeerMsgs::FextReject:
-        return len == 13U;
+        return len == sizeof(id) + sizeof(uint32_t /*piece*/) + sizeof(uint32_t /*offset*/) + sizeof(uint32_t /*length*/);
 
     case BtPeerMsgs::Piece:
-        len -= sizeof(id) + sizeof(uint32_t /*piece*/) + sizeof(uint32_t /*offset*/);
-        return len <= tr_block_info::BlockSize;
+        {
+            auto constexpr HeaderLen = sizeof(id) + sizeof(uint32_t /*piece*/) + sizeof(uint32_t /*offset*/);
+            return len >= HeaderLen && len <= HeaderLen + tr_block_info::BlockSize;
+        }
 
     case BtPeerMsgs::DhtPort:
-        return len == 3U;
+        return len == sizeof(id) + sizeof(uint16_t /*port*/);
 
     case BtPeerMsgs::Ltep:
-        return len >= 2U;
+        if (len < sizeof(id) + sizeof(uint8_t /*ltep_msgid*/)) {
+            return false;
+        }
+        break;
 
     default: // unrecognized message
         return false;
     }
+
+    // IMPORTANT: Any branches with no upper bound checks MUST NOT
+    // return early in order for program execution to reach this line.
+    // N.B. Every caller ensures len >= sizeof(id), so we don't need
+    // to check that here.
+    return len <= MaxIncomingMsgBytes;
 }
 
 namespace protocol_send_message_helpers
@@ -1380,17 +1400,7 @@ ReadResult tr_peerMsgsImpl::process_peer_message(uint8_t id, MessageReader& payl
             static_cast<int>(id),
             std::size(payload)));
 
-    if (!is_message_length_correct(tor_, id, sizeof(id) + std::size(payload))) {
-        logdbg(
-            this,
-            fmt::format(
-                "bad msg: '{:s}' ({:d}) with payload len {:d}",
-                BtPeerMsgs::debug_name(id),
-                static_cast<int>(id),
-                std::size(payload)));
-        publish(tr_peer_event::GotError(EMSGSIZE));
-        return { ReadState::Err, {} };
-    }
+    TR_ASSERT(is_message_length_correct(tor_, id, sizeof(id) + std::size(payload)));
 
     switch (id) {
     case BtPeerMsgs::Choke:
@@ -1755,6 +1765,21 @@ ReadResult tr_peerMsgsImpl::can_read_impl(tr_peerIo* io)
         }
 
         io->read_uint8(&message_type);
+
+        // The header is complete, so the length can be checked
+        // before any payload is buffered.
+        if (!is_message_length_correct(tor_, message_type, *current_message_len)) {
+            logdbg(
+                this,
+                fmt::format(
+                    "bad msg: '{:s}' ({:d}) with len {:d}, disconnecting",
+                    BtPeerMsgs::debug_name(message_type),
+                    static_cast<int>(message_type),
+                    *current_message_len));
+            disconnect_soon();
+            return { ReadState::Err, {} };
+        }
+
         current_message_type = message_type;
     }
 
@@ -1787,9 +1812,15 @@ ReadResult tr_peerMsgsImpl::can_read_impl(tr_peerIo* io)
 
 ReadState tr_peerMsgsImpl::can_read(tr_peerIo* io, void* vmsgs, size_t* piece)
 {
+    auto const msgs = static_cast<tr_peerMsgsImpl*>(vmsgs);
+    if (msgs->is_disconnecting()) {
+        io->read_buffer_discard();
+        return ReadState::Err;
+    }
+
     // Some errors (e.g. disk IO error) can immediately remove this peer from the peer mgr,
     // which will destroy this object if we don't keep it alive
-    auto const msgs = static_cast<tr_peerMsgsImpl*>(vmsgs)->shared_from_this();
+    auto const keep_alive = msgs->shared_from_this();
 
     auto ret = ReadState::Now;
     *piece = 0U;
