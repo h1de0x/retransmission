@@ -8,6 +8,7 @@
 #include <ranges>
 
 #include <libtransmission/torrent.h>
+#include <libtransmission/types.h>
 
 #include "test-fixtures.h"
 
@@ -67,6 +68,23 @@ TEST_F(TorrentTest, queueMoveDown)
     for (size_t i = 0; i < ExpectedQueuePosition.size(); ++i) {
         EXPECT_EQ(ExpectedQueuePosition[i], torrents[i]->queue_position()) << i;
     }
+}
+
+TEST_F(TorrentTest, useSessionLimitsAffectsBothDirections)
+{
+    auto* const tor = torrentInitFromFile(TorFilenames[0]);
+    ASSERT_NE(nullptr, tor);
+
+    EXPECT_TRUE(tor->bandwidth().are_parent_limits_honored(tr_direction::Up));
+    EXPECT_TRUE(tor->bandwidth().are_parent_limits_honored(tr_direction::Down));
+
+    tr_torrentUseSessionLimits(tor, false);
+    EXPECT_FALSE(tor->bandwidth().are_parent_limits_honored(tr_direction::Up));
+    EXPECT_FALSE(tor->bandwidth().are_parent_limits_honored(tr_direction::Down));
+
+    tr_torrentUseSessionLimits(tor, true);
+    EXPECT_TRUE(tor->bandwidth().are_parent_limits_honored(tr_direction::Up));
+    EXPECT_TRUE(tor->bandwidth().are_parent_limits_honored(tr_direction::Down));
 }
 
 TEST_F(TorrentTest, queueMoveTop)
