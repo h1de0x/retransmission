@@ -2,60 +2,50 @@
 // It may be used under the MIT (SPDX: MIT) license.
 // License text can be found in the licenses/ folder.
 
-#if __has_feature(modules)
-@import AppKit;
-#else
-#import <AppKit/AppKit.h>
-#endif
-
 #import "FileListNode.h"
 
-@interface FileListNode ()
-
-@property(nonatomic, readonly) NSMutableIndexSet* indexesInternal;
-@property(nonatomic) NSImage* iconInternal;
-
+@interface FileListNode () {
+  @protected
+    uint64_t _size;
+    NSIndexSet* _indexesInternal;
+}
+- (instancetype)initWithName:(NSString*)name
+                        path:(NSString*)path
+                     torrent:(Torrent*)torrent
+                        size:(uint64_t)size
+                     indexes:(NSIndexSet*)indexes;
 @end
 
-@implementation FileListNode
-
-- (instancetype)initWithFolderName:(NSString*)name path:(NSString*)path torrent:(Torrent*)torrent
-{
-    if ((self = [self initWithFolder:YES name:name path:path torrent:torrent])) {
-        _children = [[NSMutableArray alloc] init];
-        _size = 0;
-    }
-
-    return self;
-}
-
+@interface FileListFileNode : FileListNode
 - (instancetype)initWithFileName:(NSString*)name
                             path:(NSString*)path
                             size:(uint64_t)size
                            index:(NSUInteger)index
-                         torrent:(Torrent*)torrent
-{
-    if ((self = [self initWithFolder:NO name:name path:path torrent:torrent])) {
-        _size = size;
-        [_indexesInternal addIndex:index];
-    }
+                         torrent:(Torrent*)torrent;
+@end
 
-    return self;
+@interface FileListFolderNode : FileListNode {
+    NSMutableArray<FileListNode*>* _childrenInternal;
+}
+
+- (instancetype)initWithFolderName:(NSString*)name path:(NSString*)path torrent:(Torrent*)torrent;
+@end
+
+@implementation FileListNode
+
+- (NSMutableArray<FileListNode*>*)children
+{
+    return nil;
 }
 
 - (void)insertChild:(FileListNode*)child
 {
-    NSAssert(_isFolder, @"method can only be invoked on folders");
-
-    [_children addObject:child];
+    [self doesNotRecognizeSelector:_cmd];
 }
 
 - (void)insertIndex:(NSUInteger)index withSize:(uint64_t)size
 {
-    NSAssert(_isFolder, @"method can only be invoked on folders");
-
-    [self.indexesInternal addIndex:index];
-    _size += size;
+    [self doesNotRecognizeSelector:_cmd];
 }
 
 - (id)copyWithZone:(NSZone*)zone
@@ -66,20 +56,12 @@
 
 - (NSString*)description
 {
-    if (!_isFolder) {
-        return [NSString stringWithFormat:@"%@ (%ld)", _name, _indexesInternal.firstIndex];
-    } else {
-        return [NSString stringWithFormat:@"%@ (folder: %@)", _name, _indexesInternal];
-    }
+    return @"";
 }
 
-- (NSImage*)icon
+- (BOOL)isFolder
 {
-    if (!_iconInternal) {
-        _iconInternal = [NSWorkspace.sharedWorkspace
-            iconForFileType:_isFolder ? NSFileTypeForHFSTypeCode(kGenericFolderIcon) : _name.pathExtension];
-    }
-    return _iconInternal;
+    return NO;
 }
 
 - (NSIndexSet*)indexes
@@ -100,7 +82,6 @@
     {
         if ([oldName isEqualToString:self.name]) {
             _name = [newName copy];
-            _iconInternal = nil;
             return YES;
         }
     } else if (lookupPathComponents.count < thesePathComponents.count) //what's being renamed is part of this node's path
@@ -126,19 +107,93 @@
 
 #pragma mark - Private
 
-- (instancetype)initWithFolder:(BOOL)isFolder name:(NSString*)name path:(NSString*)path torrent:(Torrent*)torrent
+- (instancetype)initWithName:(NSString*)name
+                        path:(NSString*)path
+                     torrent:(Torrent*)torrent
+                        size:(uint64_t)size
+                     indexes:(NSIndexSet*)indexes
 {
     if ((self = [super init])) {
-        _isFolder = isFolder;
         _name = [name copy];
         _path = [path copy];
-
-        _indexesInternal = [[NSMutableIndexSet alloc] init];
-
         _torrent = torrent;
+        _size = size;
+        _indexesInternal = indexes;
     }
 
     return self;
 }
 
+@end
+
+@implementation FileListFileNode
+
+- (instancetype)initWithFileName:(NSString*)name
+                            path:(NSString*)path
+                            size:(uint64_t)size
+                           index:(NSUInteger)index
+                         torrent:(Torrent*)torrent
+{
+    return [self initWithName:name path:path torrent:torrent size:size indexes:[NSIndexSet indexSetWithIndex:index]];
+}
+
+- (NSString*)description
+{
+    return [NSString stringWithFormat:@"%@ (%ld)", self.name, _indexesInternal.firstIndex];
+}
+
+@end
+
+@implementation FileListFolderNode
+
+- (instancetype)initWithFolderName:(NSString*)name path:(NSString*)path torrent:(Torrent*)torrent
+{
+    if ((self = [super initWithName:name path:path torrent:torrent size:0 indexes:[[NSMutableIndexSet alloc] init]])) {
+        _childrenInternal = [[NSMutableArray alloc] init];
+    }
+    return self;
+}
+
+- (BOOL)isFolder
+{
+    return YES;
+}
+
+- (NSMutableArray<FileListNode*>*)children
+{
+    return _childrenInternal;
+}
+
+- (void)insertChild:(FileListNode*)child
+{
+    [_childrenInternal addObject:child];
+}
+
+- (void)insertIndex:(NSUInteger)index withSize:(uint64_t)size
+{
+    [(NSMutableIndexSet*)_indexesInternal addIndex:index];
+    _size += size;
+}
+
+- (NSString*)description
+{
+    return [NSString stringWithFormat:@"%@ (folder: %@)", self.name, _indexesInternal];
+}
+
+@end
+
+@implementation FileListNode (Creation)
++ (instancetype)createWithFolderName:(NSString*)name path:(NSString*)path torrent:(Torrent*)torrent
+{
+    return [[FileListFolderNode alloc] initWithFolderName:name path:path torrent:torrent];
+}
+
++ (instancetype)createWithFileName:(NSString*)name
+                              path:(NSString*)path
+                              size:(uint64_t)size
+                             index:(NSUInteger)index
+                           torrent:(Torrent*)torrent
+{
+    return [[FileListFileNode alloc] initWithFileName:name path:path size:size index:index torrent:torrent];
+}
 @end
