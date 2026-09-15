@@ -151,15 +151,15 @@ tr_variant build_metainfo_except_info_dict(tr_torrent_metainfo const& tm)
     auto top = tr_variant::Map{ 8U };
 
     if (auto const& val = tm.comment(); !std::empty(val)) {
-        top.try_emplace(TR_KEY_comment, val);
+        top.try_emplace(TR_KEY_comment, val.sv());
     }
 
     if (auto const& val = tm.source(); !std::empty(val)) {
-        top.try_emplace(TR_KEY_source, val);
+        top.try_emplace(TR_KEY_source, val.sv());
     }
 
     if (auto const& val = tm.creator(); !std::empty(val)) {
-        top.try_emplace(TR_KEY_created_by, val);
+        top.try_emplace(TR_KEY_created_by, val.sv());
     }
 
     if (auto const val = tm.date_created(); val != 0) {

@@ -13,7 +13,9 @@
 #include <cstdint>
 #include <iterator>
 #include <optional>
+#include <ranges>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
@@ -26,8 +28,8 @@ struct tr_pex;
 namespace tr::serializer
 {
 
-// These type traits are used by `to_variant()` and `to_value()` to sniff
-// out containers that support `push_back()`, `insert()`, `reserve()`, etc.
+// These type traits are used by `to_value()` to sniff out containers that
+// support `push_back()`, `insert()`, `reserve()`, etc.
 // Example uses: (de)serializing std::vector<T>, QStringList, small::set<T>
 namespace detail
 {
@@ -47,6 +49,11 @@ template<typename T>
 
 // NOLINTBEGIN(readability-identifier-naming)
 // use std-style naming for these traits
+template<typename C>
+inline constexpr bool is_basic_string_view_v = false;
+
+template<typename CharT, typename Traits>
+inline constexpr bool is_basic_string_view_v<std::basic_string_view<CharT, Traits>> = true;
 
 // Type trait: is C a std::basic_string?
 // Matches the specialization rather than comparing C against
@@ -199,13 +206,13 @@ template<typename T>
 
 // Compile-time dispatcher: routes `T` -> `tr_variant` conversion to
 // `Converter<T>` if specialized, otherwise to the generic container fallbacks
-// (push-back ranges, insert ranges, std::array, std::optional).
+// (sized ranges except for string types, std::optional).
 template<typename T>
 [[nodiscard]] tr_variant to_variant(T const& src)
 {
     if constexpr (detail::HasConverter<T>) {
         return Converter<T>::to_variant(src);
-    } else if constexpr (detail::is_push_back_range_v<T> || detail::is_insert_range_v<T> || detail::is_std_array_v<T>) {
+    } else if constexpr (std::ranges::sized_range<T> && !detail::is_basic_string_v<T> && !detail::is_basic_string_view_v<T>) {
         return detail::from_range(src);
     } else if constexpr (detail::is_optional_v<T>) {
         return detail::from_optional(src);

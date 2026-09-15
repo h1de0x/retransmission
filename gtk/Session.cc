@@ -12,6 +12,7 @@
 #include "TorrentSorter.h"
 #include "Utils.h"
 
+#include <libtransmission/converters.h>
 #include <libtransmission/env.h>
 #include <libtransmission/macros.h>
 #include <libtransmission/rpcimpl.h>
@@ -911,7 +912,7 @@ void Session::update()
 void Session::start_now(tr_torrent_id_t const id)
 {
     auto params = tr_variant::Map{ 1U };
-    params.try_emplace(TR_KEY_ids, to_variant({ id }));
+    params.try_emplace(TR_KEY_ids, tr::serializer::to_variant(std::array{ id }));
     exec(TR_KEY_torrent_start_now, std::move(params));
 }
 

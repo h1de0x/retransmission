@@ -29,6 +29,7 @@
 #include <libtransmission-app/startup-coordinator.h>
 
 #include <libtransmission/api-compat.h>
+#include <libtransmission/converters.h>
 #include <libtransmission/crypto-utils.h> // tr_base64_decode()
 #include <libtransmission/log.h>
 #include <libtransmission/macros.h>
@@ -1404,7 +1405,7 @@ bool Application::Impl::call_rpc_for_selected_torrents(tr_quark const method)
     }
 
     auto params = tr_variant::Map{ 1U };
-    params.try_emplace(TR_KEY_ids, Session::to_variant(ids));
+    params.try_emplace(TR_KEY_ids, tr::serializer::to_variant(ids));
     core_->exec(method, std::move(params));
     return true;
 }

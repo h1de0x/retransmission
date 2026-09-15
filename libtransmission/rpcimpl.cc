@@ -761,11 +761,11 @@ namespace make_torrent_field_helpers
     case TR_KEY_bytes_completed:
         return make_bytes_completed_vec(tor);
     case TR_KEY_comment:
-        return tor.comment();
+        return tor.comment().sv();
     case TR_KEY_corrupt_ever:
         return st.corrupt_ever;
     case TR_KEY_creator:
-        return tor.creator();
+        return tor.creator().sv();
     case TR_KEY_date_created:
         return tor.date_created();
     case TR_KEY_desired_available:
@@ -883,7 +883,7 @@ namespace make_torrent_field_helpers
     case TR_KEY_size_when_done:
         return st.size_when_done;
     case TR_KEY_source:
-        return tor.source();
+        return tor.source().sv();
     case TR_KEY_start_date:
         return st.start_date;
     case TR_KEY_status:
