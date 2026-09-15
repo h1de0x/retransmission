@@ -38,6 +38,7 @@ namespace
 {
 
 using file_func_t = std::function<void(std::string_view filename)>;
+using directory_filter_t = std::function<bool(std::string_view directory)>;
 
 [[nodiscard]] bool is_folder(std::string_view const path)
 {
@@ -50,11 +51,21 @@ using file_func_t = std::function<void(std::string_view filename)>;
     return is_folder(path) && std::empty(tr_sys_dir_get_files(path, tr_basename_accept_all));
 }
 
-void depth_first_walk(std::string_view const path, file_func_t const& func, std::optional<int> max_depth = {})
+void depth_first_walk(
+    std::string_view const path,
+    file_func_t const& func,
+    std::optional<int> max_depth = {},
+    directory_filter_t const& skip_directory = {})
 {
-    if (is_folder(path) && (!max_depth || *max_depth > 0)) {
-        for (auto const& name : tr_sys_dir_get_files(path, tr_basename_accept_all)) {
-            depth_first_walk(tr_pathbuf{ path, '/', name }, func, max_depth ? *max_depth - 1 : max_depth);
+    if (is_folder(path)) {
+        // A skipped directory is neither traversed nor passed to func.
+        if (skip_directory && skip_directory(path)) {
+            return;
+        }
+        if (!max_depth || *max_depth > 0) {
+            for (auto const& name : tr_sys_dir_get_files(path, tr_basename_accept_all)) {
+                depth_first_walk(tr_pathbuf{ path, '/', name }, func, max_depth ? *max_depth - 1 : max_depth, skip_directory);
+            }
         }
     }
 
@@ -85,32 +96,6 @@ void remove_junk(std::string_view const filename)
 {
     if (is_empty_folder(filename) || is_junk_file(filename)) {
         tr_sys_path_remove(filename);
-    }
-}
-
-// Keep configured roots out of cleanup, including on case-insensitive
-// filesystems. A tree inside a root can still be cleaned. Only confirmed
-// absence rules out containment; other errors conservatively prevent cleanup.
-bool tree_contains_path(std::string_view tree, std::string_view path, tr_error& error)
-{
-    auto const resolved_tree = tr_sys_path_resolve(tree, &error);
-    if (std::empty(resolved_tree)) {
-        return !tr_error_is_enoent(error.code());
-    }
-    auto const resolved_path = tr_sys_path_resolve(path, &error);
-    if (std::empty(resolved_path)) {
-        return !tr_error_is_enoent(error.code());
-    }
-
-    for (auto walk = std::string_view{ resolved_path };;) {
-        if (tr_sys_path_is_same(resolved_tree, walk, &error) || error) {
-            return true;
-        }
-        auto const parent = tr_sys_path_dirname(walk);
-        if (parent == walk) {
-            return false;
-        }
-        walk = parent;
     }
 }
 
@@ -233,6 +218,23 @@ bool tr_torrent_files::move(
         }
     }
 
+    // Protect the roots themselves while still cleaning their siblings and
+    // ancestors. If identity cannot be checked, leave the directory alone.
+    auto const skip_directory = [&parent, old_parents, parent_name](std::string_view directory) {
+        auto const is_root = [directory, parent_name](auto root) {
+            auto path_error = tr_error{};
+            if (!tr_sys_path_is_same(directory, root, &path_error) && !path_error) {
+                return false;
+            }
+            tr_logAddDebug(
+                path_error ? fmt::format("Skipping cleanup of '{:s}': {:s}", directory, path_error.message()) :
+                             fmt::format("Skipping cleanup of '{:s}': configured root '{:s}'", directory, root),
+                parent_name);
+            return true;
+        };
+        return is_root(parent.sv()) || std::ranges::any_of(old_parents, is_root);
+    };
+
     for (auto const old_parent : old_parents) {
         if (tr_sys_path_is_same(old_parent, parent)) {
             continue;
@@ -249,24 +251,7 @@ bool tr_torrent_files::move(
         }
         for (auto const top : trees) {
             auto const tree = tr_pathbuf{ old_parent, '/', top };
-            auto const contains_root = [&tree, parent_name](auto root) {
-                auto path_error = tr_error{};
-                if (!tree_contains_path(tree, root, path_error)) {
-                    return false;
-                }
-                tr_logAddDebug(
-                    path_error ? fmt::format("Skipping cleanup of '{:s}': {:s}", tree.sv(), path_error.message()) :
-                                 fmt::format("Skipping cleanup of '{:s}': contains root '{:s}'", tree.sv(), root),
-                    parent_name);
-                return true;
-            };
-            // Do not enter a configured root. A tree inside another root is
-            // allowed; cleanup only removes junk and empty directories.
-            if (contains_root(parent.sv()) ||
-                std::ranges::any_of(old_parents, [&](auto root) { return root != old_parent && contains_root(root); })) {
-                continue;
-            }
-            depth_first_walk(tree, remove_junk);
+            depth_first_walk(tree, remove_junk, {}, skip_directory);
         }
     }
 

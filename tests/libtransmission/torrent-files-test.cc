@@ -75,14 +75,19 @@ TEST_F(TorrentFilesMoveTest, cleanupPreservesNestedRootAndDestination)
         auto const roots = std::array<std::string_view, 2>{ download.sv(), incomplete.sv() };
         auto files = tr_torrent_files{};
         files.add("name/data", 1);
+        files.add("name/dir1/file", 1);
         createFileWithContents(tr_pathbuf{ download, "/name/data"sv }, "data"sv);
+        createFileWithContents(tr_pathbuf{ download, "/name/dir1/file"sv }, "other"sv);
         // Even junk inside a protected root must survive.
         createFileWithContents(tr_pathbuf{ nested, "/desktop.ini"sv }, "protected"sv);
 
         ASSERT_TRUE(files.move(roots, target, "name"));
         expectContents(tr_pathbuf{ nested, "/desktop.ini"sv }, "protected"sv);
         expectContents(tr_pathbuf{ target, "/name/data"sv }, "data"sv);
+        expectContents(tr_pathbuf{ target, "/name/dir1/file"sv }, "other"sv);
         EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ download, "/name/data"sv }));
+        // A protected subtree must not prevent cleanup of its empty sibling.
+        EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ download, "/name/dir1"sv }));
     }
 }
 
