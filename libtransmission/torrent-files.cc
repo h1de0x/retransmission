@@ -218,8 +218,8 @@ bool tr_torrent_files::move(
         }
     }
 
-    // Protect the roots themselves while still cleaning their siblings and
-    // ancestors. If identity cannot be checked, leave the directory alone.
+    // Protect the roots themselves while still cleaning their siblings and ancestors.
+    // If identity cannot be checked, leave the directory alone.
     auto const skip_directory = [&parent, old_parents, parent_name](std::string_view directory) {
         auto const is_root = [directory, parent_name](auto root) {
             auto path_error = tr_error{};
@@ -240,8 +240,8 @@ bool tr_torrent_files::move(
             continue;
         }
 
-        // Derive each tree from a moved file, not the torrent name. Scan it
-        // once and leave unused trees alone.
+        // Derive each tree from a moved file, not the torrent name.
+        // Scan it once and leave unused trees alone.
         auto trees = std::set<std::string_view>{};
         for (auto const& found : moves | std::views::values) {
             auto const slash = found.subpath.find('/');
@@ -277,8 +277,8 @@ void tr_torrent_files::remove(
         }
         auto root_error = tr_error{};
         remove(parent, tmpdir_prefix, func, &root_error);
-        // Process independent roots even when an earlier root reported an
-        // error, and preserve the first error for the caller.
+        // Process independent roots even when an earlier root reported an error,
+        // and preserve the first error for the caller.
         if (root_error && !*error) {
             *error = std::move(root_error);
         }

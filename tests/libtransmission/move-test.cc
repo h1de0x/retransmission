@@ -281,8 +281,8 @@ TEST_P(IncompleteDirTest, completionMovesFilesOutsideCurrentDir)
     auto* const tor = zeroTorrentInit(ZeroTorrentState::NoFiles);
     for (tr_file_index_t i = 0; i < tor->file_count(); ++i) {
         auto const file = tr_torrentFile(tor, i);
-        // The first file makes current_dir point at downloadDir; all the other
-        // files must still be consolidated when verification completes.
+        // The first file makes current_dir point at downloadDir;
+        // all the other files must still be consolidated when verification completes.
         auto const& base = i == 0 ? download_dir : incomplete_dir;
         createFileWithContents(tr_pathbuf{ base, '/', file.name }, std::string(static_cast<size_t>(file.length), '\0'));
     }
