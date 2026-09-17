@@ -178,8 +178,10 @@ bool tr_torrent_files::move(
     error = error != nullptr ? error : &local_error;
 
     // Select sources before moving files; retain them to identify cleanup trees.
+    auto const n = file_count();
     auto moves = std::vector<std::pair<tr_file_index_t, FoundFile>>{};
-    for (tr_file_index_t i = 0, n = file_count(); i < n; ++i) {
+    moves.reserve(n);
+    for (tr_file_index_t i = 0; i < n; ++i) {
         auto const found = find(i, old_parents);
         if (!found) {
             continue;
