@@ -37,7 +37,7 @@ using namespace std::literals;
 namespace
 {
 
-using file_func_t = std::function<void(std::string_view filename)>;
+using path_func_t = std::function<void(std::string_view path)>;
 using directory_filter_t = std::function<bool(std::string_view directory)>;
 
 [[nodiscard]] bool is_folder(std::string_view const path)
@@ -53,7 +53,7 @@ using directory_filter_t = std::function<bool(std::string_view directory)>;
 
 void depth_first_walk(
     std::string_view const path,
-    file_func_t const& func,
+    path_func_t const& func,
     std::optional<int> max_depth = {},
     directory_filter_t const& skip_directory = {})
 {
