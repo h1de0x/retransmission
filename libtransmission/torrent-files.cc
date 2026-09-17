@@ -162,9 +162,9 @@ std::string_view tr_torrent_files::primary_mime_type() const
 // ---
 
 bool tr_torrent_files::move(
-    std::span<std::string_view const> old_parents,
-    std::string_view parent_in,
-    std::string_view parent_name,
+    std::span<std::string_view const> const old_parents,
+    std::string_view const parent_in,
+    std::string_view const parent_name,
     tr_error* error) const
 {
     auto const parent = tr_pathbuf{ parent_in };
