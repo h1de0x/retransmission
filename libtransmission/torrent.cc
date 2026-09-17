@@ -1787,8 +1787,8 @@ void tr_torrent::recheck_completeness()
             }
             date_done_ = tr_time();
 
-            auto const incomplete = incomplete_dir().sv();
-            if (!std::empty(incomplete) && files().has_any_local_data(std::span{ &incomplete, 1U })) {
+            if (auto const incomplete = incomplete_dir().sv(); current_dir() == incomplete ||
+                (!std::empty(incomplete) && files().has_any_local_data(std::span{ &incomplete, 1U }))) {
                 set_location(download_dir().sv(), true, nullptr);
             }
 
