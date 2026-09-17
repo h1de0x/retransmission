@@ -27,11 +27,9 @@
 
 using namespace std::literals;
 
-using TorrentFilesTest = ::tr::test::SandboxedTest;
-
 namespace
 {
-class TorrentFilesMoveTest : public ::tr::test::SandboxedTest
+class TorrentFilesTest : public ::tr::test::SandboxedTest
 {
 protected:
     static void expectContents(std::string_view path, std::string_view expected)
@@ -43,7 +41,7 @@ protected:
 };
 } // namespace
 
-TEST_F(TorrentFilesMoveTest, consolidatesIntoSourceRoot)
+TEST_F(TorrentFilesTest, consolidatesIntoSourceRoot)
 {
     auto const download = tr_pathbuf{ sandboxDir(), "/download"sv };
     auto const incomplete = tr_pathbuf{ sandboxDir(), "/incomplete"sv };
@@ -63,7 +61,7 @@ TEST_F(TorrentFilesMoveTest, consolidatesIntoSourceRoot)
     EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ download, "/name"sv }));
 }
 
-TEST_F(TorrentFilesMoveTest, cleanupPreservesNestedRootAndDestination)
+TEST_F(TorrentFilesTest, cleanupPreservesNestedRootAndDestination)
 {
     for (auto const destination_is_nested : { false, true }) {
         SCOPED_TRACE(destination_is_nested);
@@ -91,7 +89,7 @@ TEST_F(TorrentFilesMoveTest, cleanupPreservesNestedRootAndDestination)
     }
 }
 
-TEST_F(TorrentFilesMoveTest, cleanupRemovesJunkAndPreservesOrdinaryEntries)
+TEST_F(TorrentFilesTest, cleanupRemovesJunkAndPreservesOrdinaryEntries)
 {
     auto const download = tr_pathbuf{ sandboxDir(), "/download"sv };
     auto const target = tr_pathbuf{ sandboxDir(), "/target"sv };
