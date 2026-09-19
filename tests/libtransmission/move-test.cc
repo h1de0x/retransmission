@@ -22,6 +22,7 @@
 #include <libtransmission/local-data.h>
 #include <libtransmission/quark.h>
 #include <libtransmission/session.h>
+#include <libtransmission/shared-string.h>
 #include <libtransmission/torrent-files.h>
 #include <libtransmission/torrent.h>
 #include <libtransmission/tr-strbuf.h>
@@ -252,6 +253,41 @@ TEST_P(IncompleteDirTest, removeFindsFilesInBothRoots)
 TEST_P(IncompleteDirTest, backendRemoveFindsFilesInBothRoots)
 {
     checkRemoveLocalData(true);
+}
+
+TEST_P(IncompleteDirTest, currentDirUsesFirstExistingFile)
+{
+    std::string const download_dir = tr_sessionGetDownloadDir(session_);
+    std::string const incomplete_dir = tr_sessionGetIncompleteDir(session_);
+    auto* const tor = zeroTorrentInit(ZeroTorrentState::NoFiles);
+    ASSERT_NE(nullptr, tor);
+    EXPECT_EQ(incomplete_dir, tor->current_dir().sv());
+
+    // Earlier files are absent; only the last file exists, with a .part suffix.
+    auto const last = tr_torrentFile(tor, tor->file_count() - 1);
+    auto const path = tr_pathbuf{ download_dir, '/', last.name, tr_torrent_files::PartialFileSuffix };
+    createFileWithContents(path, "partial"sv);
+    {
+        auto const lock = tor->unique_lock();
+        // A supplied miss must not trigger a fresh search, even if a file has since appeared.
+        tor->refresh_current_dir(tr::shared_string{});
+        EXPECT_EQ(incomplete_dir, tor->current_dir().sv());
+    }
+    // Later location changes must search again, without retaining the initialization result.
+    ASSERT_EQ(TR_LOC_DONE, setLocation(tor, download_dir, false));
+    EXPECT_EQ(download_dir, tor->current_dir().sv());
+    EXPECT_TRUE(tr_sys_path_exists(path));
+
+    ASSERT_TRUE(tr_sys_path_remove(path));
+    {
+        auto const lock = tor->unique_lock();
+        // A supplied hit is also reused rather than rechecked.
+        tor->refresh_current_dir(tr::shared_string{ download_dir });
+        EXPECT_EQ(download_dir, tor->current_dir().sv());
+    }
+    ASSERT_EQ(TR_LOC_DONE, setLocation(tor, download_dir, false));
+    EXPECT_EQ(incomplete_dir, tor->current_dir().sv());
+    tr_torrentRemove(tor, false);
 }
 
 TEST_P(IncompleteDirTest, setLocationFindsFilesOutsideCurrentDir)

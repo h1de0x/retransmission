@@ -103,6 +103,8 @@ struct tr_torrent {
         }
 
         tr_torrent& tor_;
+        // Disengaged until the resume file scan runs; an empty string means no file was found.
+        std::optional<tr::shared_string> first_found_dir_;
     };
 
     class CumulativeCount
@@ -707,7 +709,8 @@ struct tr_torrent {
 
     void set_download_dir(std::string_view path, bool is_new_torrent = false);
 
-    void refresh_current_dir();
+    // A supplied result belongs to the current initialization, not a persistent filesystem cache.
+    void refresh_current_dir(std::optional<tr::shared_string> const& first_found_dir = {});
 
     [[nodiscard]] constexpr auto id() const noexcept
     {

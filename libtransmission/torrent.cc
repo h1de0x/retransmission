@@ -813,9 +813,6 @@ void tr_torrent::on_metainfo_updated()
 
 void tr_torrent::on_metainfo_completed()
 {
-    // we can look for files now that we know what files are in the torrent
-    refresh_current_dir();
-
     callScriptIfEnabled(this, TR_SCRIPT_ON_TORRENT_ADDED);
 
     if (session->shouldFullyVerifyAddedTorrents() || !is_new_torrent_a_seed()) {
@@ -923,6 +920,7 @@ void tr_torrent::init(tr_torrent_builder const& builder)
     set_sequential_download(session->sequential_download());
 
     tr_resume::fields_t loaded = {};
+    auto resume_helper = ResumeHelper{ *this };
 
     {
         // tr_resume::load() calls a lot of tr_torrentSetFoo() methods
@@ -930,7 +928,6 @@ void tr_torrent::init(tr_torrent_builder const& builder)
         // the same ones that would be saved back again, so don't let them
         // affect the 'is dirty' flag.
         auto const was_dirty = is_dirty();
-        auto resume_helper = ResumeHelper{ *this };
         // another default for the resume file to overwrite; it sits inside this guard because it dirties the torrent
         set_peer_limit(static_cast<uint16_t>(session->peerLimitPerTorrent()));
 
@@ -948,7 +945,8 @@ void tr_torrent::init(tr_torrent_builder const& builder)
     builder.init_torrent_priorities(*this);
     builder.init_torrent_wanted(*this);
 
-    refresh_current_dir();
+    // Reuse the resume scan, including a miss, rather than searching the same paths again.
+    refresh_current_dir(resume_helper.first_found_dir_);
 
     if ((loaded & tr_resume::Speedlimit) == 0) {
         use_speed_limit(tr_direction::Up, false);
@@ -1037,6 +1035,8 @@ void tr_torrent::set_metainfo(tr_torrent_metainfo tm)
     set_dirty();
     mark_edited();
 
+    // init() already refreshes regular torrents; magnets can only search after receiving metainfo.
+    refresh_current_dir();
     on_metainfo_completed();
     this->on_announce_list_changed();
 }
@@ -2262,7 +2262,7 @@ void tr_torrent::set_download_dir(std::string_view path, bool is_new_torrent)
 }
 
 // decide whether we should be looking for files in downloadDir or incompleteDir
-void tr_torrent::refresh_current_dir()
+void tr_torrent::refresh_current_dir(std::optional<tr::shared_string> const& first_found_dir)
 {
     auto dir = tr::shared_string{};
 
@@ -2271,9 +2271,17 @@ void tr_torrent::refresh_current_dir()
     } else if (!has_metainfo()) // no files to find
     {
         dir = incomplete_dir();
+    } else if (first_found_dir) {
+        dir = !first_found_dir->empty() ? *first_found_dir : incomplete_dir();
     } else {
-        auto const found = find_file(0);
-        dir = found ? tr::shared_string{ found->base } : incomplete_dir();
+        dir = incomplete_dir();
+        auto const paths = search_paths();
+        for (tr_file_index_t i = 0, n = file_count(); i < n; ++i) {
+            if (auto const found = files().find(i, paths); found) {
+                dir = tr::shared_string{ found->base };
+                break;
+            }
+        }
     }
 
     TR_ASSERT(!std::empty(dir));
@@ -2526,8 +2534,13 @@ void tr_torrent::ResumeHelper::load_checked_pieces(tr_bitfield const& checked, t
     auto const n_files = tor_.file_count();
     tor_.file_mtimes_.resize(n_files);
 
+    first_found_dir_.emplace();
+    auto const paths = tor_.search_paths();
     for (size_t file = 0; file < n_files; ++file) {
-        auto const found = tor_.find_file(file);
+        auto const found = tor_.files().find(file, paths);
+        if (found && first_found_dir_->empty()) {
+            *first_found_dir_ = found->base;
+        }
         auto const mtime = found ? found->last_modified_at : 0;
 
         tor_.file_mtimes_[file] = mtime;
