@@ -102,7 +102,7 @@ protected:
         EXPECT_FALSE(tr_sys_path_exists(incomplete_tree));
     }
 
-    void checkSetLocationToNewDirectory(bool partial_first_file)
+    void checkSetLocationToNewDirectory(bool partial_first_file, bool via_backend = false)
     {
         std::string const download_dir = tr_sessionGetDownloadDir(session_);
         std::string const incomplete_dir = tr_sessionGetIncompleteDir(session_);
@@ -129,7 +129,21 @@ protected:
             createFileWithContents(tr_pathbuf{ incomplete_dir, '/', tor->name(), "/desktop.ini"sv }, "junk"sv);
         }
 
-        ASSERT_EQ(TR_LOC_DONE, setLocation(tor, target_dir));
+        if (via_backend) {
+            auto result = std::make_shared<std::promise<int>>();
+            auto ready = result->get_future();
+            session_->run_in_session_thread([session = session_, tor, target = std::string{ target_dir.sv() }, result]() {
+                session->local_data.move(tor->id(), target, tor->name(), [result](auto, tr_error const& error) {
+                    result->set_value(error ? error.code() : 0);
+                });
+            });
+            ASSERT_EQ(std::future_status::ready, ready.wait_for(5s));
+            ASSERT_EQ(0, ready.get());
+            // The backend only moves files; update Location without moving them again.
+            ASSERT_EQ(TR_LOC_DONE, setLocation(tor, target_dir, false));
+        } else {
+            ASSERT_EQ(TR_LOC_DONE, setLocation(tor, target_dir));
+        }
         if (!partial_first_file) {
             EXPECT_EQ(""s, tr_torrentFindFile(tor, 0));
         }
@@ -141,7 +155,9 @@ protected:
         }
         EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ download_dir, '/', tor->name() }));
         EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ incomplete_dir, '/', tor->name() }));
-        EXPECT_TRUE(tor->incomplete_dir().empty());
+        if (!via_backend) {
+            EXPECT_TRUE(tor->incomplete_dir().empty());
+        }
         EXPECT_EQ(target_dir.sv(), tor->download_dir().sv());
         EXPECT_EQ(target_dir.sv(), tor->current_dir().sv());
         tr_torrentRemove(tor, true);
@@ -246,6 +262,11 @@ TEST_P(IncompleteDirTest, setLocationFindsFilesOutsideCurrentDir)
 TEST_P(IncompleteDirTest, setLocationMovesFilesFromBothRoots)
 {
     checkSetLocationToNewDirectory(true);
+}
+
+TEST_P(IncompleteDirTest, backendMovesFilesFromBothRoots)
+{
+    checkSetLocationToNewDirectory(true, true);
 }
 
 TEST_P(IncompleteDirTest, setLocationOverwritesExistingDestination)

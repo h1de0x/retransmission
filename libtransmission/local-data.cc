@@ -156,7 +156,6 @@ public:
 
     [[nodiscard]] tr_error_code_t move(
         tr_torrent_id_t const id,
-        std::string_view const old_parent,
         std::string_view const parent,
         std::string_view const parent_name) override
     {
@@ -166,7 +165,7 @@ public:
         }
 
         auto error = tr_error{};
-        if (tor->files().move(std::span{ &old_parent, 1U }, parent, parent_name, &error)) {
+        if (tor->files().move(tor->search_paths(), parent, parent_name, &error)) {
             return 0;
         }
 
@@ -307,13 +306,12 @@ void LocalData::close_all()
 
 void LocalData::move(
     tr_torrent_id_t const id,
-    std::string_view const old_parent,
     std::string_view const parent,
     std::string_view const parent_name,
     OnMove on_move) // NOLINT(performance-unnecessary-value-param)
 {
     drain();
-    auto const err = backend_->move(id, old_parent, parent, parent_name);
+    auto const err = backend_->move(id, parent, parent_name);
 
     if (on_move) {
         std::move(on_move)(id, make_error(err));
