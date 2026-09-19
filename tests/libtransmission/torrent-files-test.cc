@@ -113,7 +113,7 @@ TEST_F(TorrentFilesTest, cleanupRemovesJunkAndPreservesOrdinaryEntries)
     expectContents(tr_pathbuf{ unused, "/name/desktop.ini"sv }, "unused root"sv);
 }
 
-TEST_F(TorrentFilesTest, removePreservesUnusedRoot)
+TEST_F(TorrentFilesTest, removePreservesRootsWithoutMatchingFiles)
 {
     auto const used = tr_pathbuf{ sandboxDir(), "/used"sv };
     auto const unused = tr_pathbuf{ sandboxDir(), "/unused"sv };
@@ -133,6 +133,20 @@ TEST_F(TorrentFilesTest, removePreservesUnusedRoot)
     ASSERT_TRUE(tr_file_read(junk, contents));
     EXPECT_EQ("foreign"sv, (std::string_view{ contents.data(), contents.size() }));
     EXPECT_TRUE(tr_sys_path_exists(empty));
+
+    // A previously used root is also left alone after its data is deleted by hand.
+    auto const data = tr_pathbuf{ used, "/name/data"sv };
+    auto const leftover_junk = tr_pathbuf{ used, "/name/.DS_Store"sv };
+    auto const leftover_empty = tr_pathbuf{ used, "/name/empty"sv };
+    createFileWithContents(data, "data"sv);
+    createFileWithContents(leftover_junk, "junk"sv);
+    ASSERT_TRUE(tr_sys_dir_create(leftover_empty, TR_SYS_DIR_CREATE_PARENTS, 0700));
+    ASSERT_TRUE(tr_sys_path_remove(data));
+
+    files.remove(roots, "name", tr_sys_path_remove);
+
+    expectContents(leftover_junk, "junk"sv);
+    EXPECT_TRUE(tr_sys_path_exists(leftover_empty));
 }
 
 TEST_F(TorrentFilesTest, add)

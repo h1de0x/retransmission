@@ -273,7 +273,9 @@ void tr_torrent_files::remove(
 
     for (auto const parent : parents) {
         // The single-root remove() also cleans junk and empty directories.
-        // Do not run that cleanup in a root with no matching torrent files.
+        // Only run that cleanup when matching torrent files are found.
+        // This deliberately leaves empty directories and junk after manual data deletion;
+        // without matching files, we cannot distinguish them from unrelated directories.
         if (!has_any_local_data(std::span{ &parent, 1U })) {
             continue;
         }
