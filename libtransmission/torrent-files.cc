@@ -232,13 +232,26 @@ bool tr_torrent_files::move(
     auto const skip_directory = [&parent, old_parents, parent_name](std::string_view directory) {
         auto const is_root = [directory, parent_name](auto root) {
             auto path_error = tr_error{};
-            if (!tr_sys_path_is_same(directory, root, &path_error) && !path_error) {
+            auto const same = tr_sys_path_is_same(directory, root, &path_error);
+
+            // If identity cannot be checked, preserve the directory and report why.
+            if (path_error) {
+                tr_logAddWarn(
+                    fmt::format(
+                        fmt::runtime(_("Couldn't compare '{path}' with '{root}': {error} ({error_code}); leaving it alone")),
+                        fmt::arg("path", directory),
+                        fmt::arg("root", root),
+                        fmt::arg("error", path_error.message()),
+                        fmt::arg("error_code", path_error.code())),
+                    parent_name);
+                return true;
+            }
+
+            if (!same) {
                 return false;
             }
-            tr_logAddDebug(
-                path_error ? fmt::format("Skipping cleanup of '{:s}': {:s}", directory, path_error.message()) :
-                             fmt::format("Skipping cleanup of '{:s}': configured root '{:s}'", directory, root),
-                parent_name);
+
+            tr_logAddDebug(fmt::format("Skipping cleanup of '{:s}': configured root '{:s}'", directory, root), parent_name);
             return true;
         };
         return is_root(parent.sv()) || std::ranges::any_of(old_parents, is_root);
