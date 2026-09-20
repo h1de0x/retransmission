@@ -95,7 +95,14 @@ bool is_junk_file(std::string_view filename)
 void remove_junk(std::string_view const filename)
 {
     if (is_empty_folder(filename) || is_junk_file(filename)) {
-        tr_sys_path_remove(filename);
+        if (auto error = tr_error{}; !tr_sys_path_remove(filename, &error)) {
+            tr_logAddWarn(
+                fmt::format(
+                    fmt::runtime(_("Couldn't remove '{path}': {error} ({error_code})")),
+                    fmt::arg("path", filename),
+                    fmt::arg("error", error.message()),
+                    fmt::arg("error_code", error.code())));
+        }
     }
 }
 
