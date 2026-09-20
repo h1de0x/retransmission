@@ -57,12 +57,13 @@ void depth_first_walk(
     std::optional<int> max_depth = {},
     directory_filter_t const& skip_directory = {})
 {
-    if (is_folder(path)) {
+    auto const can_descend = !max_depth || *max_depth > 0;
+    if ((can_descend || skip_directory) && is_folder(path)) {
         // A skipped directory is neither traversed nor passed to func.
         if (skip_directory && skip_directory(path)) {
             return;
         }
-        if (!max_depth || *max_depth > 0) {
+        if (can_descend) {
             for (auto const& name : tr_sys_dir_get_files(path, tr_basename_accept_all)) {
                 depth_first_walk(tr_pathbuf{ path, '/', name }, func, max_depth ? *max_depth - 1 : max_depth, skip_directory);
             }
