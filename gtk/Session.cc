@@ -1228,7 +1228,7 @@ void Session::open_folder(tr_torrent_id_t torrent_id) const
     if (auto const* tor = find_torrent(torrent_id); tor != nullptr) {
         auto const current_dir = tr_torrentGetCurrentDir(tor);
 
-        if (tr_torrentFileCount(tor) == 1) {
+        if (tr_torrentFileCount(tor) == 1 && !tr_torrentView(tor).is_folder) {
             gtr_open_file(current_dir);
         } else {
             gtr_open_file(current_dir, tr_torrentName(tor));
