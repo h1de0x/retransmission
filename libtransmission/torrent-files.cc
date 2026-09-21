@@ -206,6 +206,10 @@ bool tr_torrent_files::move(
         moves.emplace_back(i, *found);
     }
 
+    if (std::empty(moves)) {
+        return true;
+    }
+
     if (!tr_sys_dir_create(parent, TR_SYS_DIR_CREATE_PARENTS, 0777, error)) {
         return false;
     }
