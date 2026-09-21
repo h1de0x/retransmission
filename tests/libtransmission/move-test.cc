@@ -63,7 +63,7 @@ protected:
         auto result = std::make_shared<std::promise<int>>();
         auto ready = result->get_future();
         session_->run_in_session_thread([tor, path = std::string{ path }, move, result]() {
-            auto state = int{ TR_LOC_MOVING };
+            auto state = -1;
             tr_torrentSetLocation(tor, path, move, &state);
             result->set_value(state);
         });
