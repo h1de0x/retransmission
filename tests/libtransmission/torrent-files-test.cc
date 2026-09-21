@@ -78,6 +78,8 @@ TEST_F(TorrentFilesTest, cleanupPreservesNestedRootAndDestination)
         createFileWithContents(tr_pathbuf{ download, "/name/dir1/file"sv }, "other"sv);
         // Even junk inside a protected root must survive.
         createFileWithContents(tr_pathbuf{ nested, "/desktop.ini"sv }, "protected"sv);
+        // Junk in its parent must still be cleaned.
+        createFileWithContents(tr_pathbuf{ download, "/name/desktop.ini"sv }, "junk"sv);
 
         ASSERT_TRUE(files.move(roots, target, "name"));
         expectContents(tr_pathbuf{ nested, "/desktop.ini"sv }, "protected"sv);
@@ -86,6 +88,7 @@ TEST_F(TorrentFilesTest, cleanupPreservesNestedRootAndDestination)
         EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ download, "/name/data"sv }));
         // A protected subtree must not prevent cleanup of its empty sibling.
         EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ download, "/name/dir1"sv }));
+        EXPECT_FALSE(tr_sys_path_exists(tr_pathbuf{ download, "/name/desktop.ini"sv }));
     }
 }
 
