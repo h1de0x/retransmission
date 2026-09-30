@@ -44,7 +44,7 @@ auto const Win10IconFamily = QStringLiteral("Segoe MDL2 Assets");
 // NOLINTNEXTLINE(cert-err58-cpp)
 auto const Win11IconFamily = QStringLiteral("Segoe Fluent Icons");
 
-// Define these two macros to force a specific icon icon during development.
+// Define these two macros to force a specific icon font during development.
 // Their EULA doesn't allow redistribution but does allow using them
 // during design/develop/testing.
 // 1. Snag the ttf you want to use (Win 10 uses https://aka.ms/SegoeFonts,
@@ -65,7 +65,7 @@ QString getWindowsFontFamily()
         return Win11IconFamily;
     }
 
-    if (QOperatingSystemVersion::current() >= QOperatingSystemVersion(QOperatingSystemVersion::Windows, 10)) {
+    if (QOperatingSystemVersion::current() >= QOperatingSystemVersion::Windows10) {
         return Win10IconFamily;
     }
 
@@ -249,7 +249,7 @@ struct Info {
  *
  * This is an extremely limited icon set. Use with caution.
  * https://github.com/transmission/transmission/pull/2283 has galleries.
- * This is used as a fallback to ensure all toolbar acitions have icons,
+ * This is used as a fallback to ensure all toolbar actions have icons,
  * even on very old Windows / macOS systems lacking Segoe / SF Symbols.
  */
 [[nodiscard]] constexpr Info getInfo(Type const type)
@@ -484,8 +484,6 @@ struct Info {
         break;
 
     case Type::PauseTorrent:
-        [[fallthrough]];
-
     case Type::TorrentStatePaused:
         sf_symbol_name = "pause";
         segoe_codepoint = 0xE769U; // Pause
@@ -500,8 +498,6 @@ struct Info {
         break;
 
     case Type::VerifyTorrent:
-        [[fallthrough]];
-
     case Type::TorrentStateVerifying:
         sf_symbol_name = "arrow.clockwise";
         segoe_codepoint = 0xE72CU; // Refresh
@@ -510,8 +506,6 @@ struct Info {
         break;
 
     case Type::TorrentErrorEmblem:
-        [[fallthrough]];
-
     case Type::TorrentStateError:
         sf_symbol_name = "xmark.circle";
         segoe_codepoint = 0xEB90U; // StatusErrorFull
@@ -530,6 +524,11 @@ struct Info {
 }
 } // namespace
 
+QIcon icon(Type const type)
+{
+    return icon(type, QApplication::style());
+}
+
 QIcon icon(Type const type, QStyle const* const style)
 {
     ensureFontsLoaded();
@@ -545,8 +544,10 @@ QIcon icon(Type const type, QStyle const* const style)
 #endif
 
     if (auto const key = info.segoe_codepoint) {
-        if (auto const family = getWindowsFontFamily(); !family.isEmpty()) {
-            auto const font = QFont{ family };
+        // The Windows version can't change while the app runs.
+        static auto const WindowsFontFamily = getWindowsFontFamily();
+        if (!WindowsFontFamily.isEmpty()) {
+            auto const font = QFont{ WindowsFontFamily };
             if (auto const glyph = QChar{ key }; QFontMetrics{ font }.inFont(glyph)) {
                 return QIcon{ new FontGlyphIconEngine{ font, glyph } };
             }
@@ -571,7 +572,7 @@ QIcon icon(Type const type, QStyle const* const style)
     return {};
 }
 
-[[nodiscard]] bool shouldBeShownInMenu(Type type)
+[[nodiscard]] bool shouldBeShownInMenu(Type const type)
 {
     static bool const ForceIcons = !qgetenv("TR_SHOW_MENU_ICONS").isEmpty();
     static bool const IsGnome = qgetenv("XDG_CURRENT_DESKTOP").contains("GNOME");
