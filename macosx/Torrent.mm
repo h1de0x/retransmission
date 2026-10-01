@@ -554,7 +554,7 @@ static tr_torrent_rename_done_func makeRenameDoneCallback(NSDictionary* contextI
         [NSNotificationCenter.defaultCenter postNotificationName:@"UpdateStats" object:nil];
     } else {
         NSAlert* alert = [[NSAlert alloc] init];
-        alert.messageText = NSLocalizedString(@"There was an error moving the data file.", "Move error alert -> title");
+        alert.messageText = NSLocalizedString(@"Couldn't move torrent", "Move error alert -> title");
         alert.informativeText = [NSString
             stringWithFormat:NSLocalizedString(@"The move operation of \"%@\" cannot be done.", "Move error alert -> message"), self.name];
         [alert addButtonWithTitle:NSLocalizedString(@"OK", "Move error alert -> button")];
@@ -590,7 +590,7 @@ static tr_torrent_rename_done_func makeRenameDoneCallback(NSDictionary* contextI
                 stringWithFormat:NSLocalizedString(@"Not enough remaining disk space to download \"%@\" completely.", "Torrent disk space alert -> title"),
                                  self.name];
             alert.informativeText = [NSString stringWithFormat:NSLocalizedString(
-                                                                   @"The transfer will be paused."
+                                                                   @"The torrent will be paused."
                                                                     " Clear up space on %@ or deselect files in the torrent inspector to continue.",
                                                                    "Torrent disk space alert -> message"),
                                                                volumeName];
@@ -958,11 +958,8 @@ static tr_torrent_rename_done_func makeRenameDoneCallback(NSDictionary* contextI
 
     NSString* error = tr_strv_to_utf8_nsstring(self.fStat.error_string);
     if (!error || [error isEqualToString:@""]) {
-        error = [NSString stringWithFormat:@"(%@)", NSLocalizedString(@"unreadable error", "Torrent -> error string unreadable")];
+        error = [NSString stringWithFormat:@"(%@)", NSLocalizedString(@"Unknown error", "Torrent -> error string unreadable")];
     }
-
-    //libtransmission uses "Set Location", Mac client uses "Move data file to..." - very hacky!
-    error = [error stringByReplacingOccurrencesOfString:@"Set Location" withString:[@"Move Data File To" stringByAppendingEllipsis]];
 
     return error;
 }
@@ -1036,7 +1033,7 @@ static tr_torrent_rename_done_func makeRenameDoneCallback(NSDictionary* contextI
                                        [NSString percentString:self.fStat.metadata_percent_complete longDecimals:YES]] :
             NSLocalizedString(@"torrent metadata needed", "Torrent -> progress string");
 
-        return [NSString stringWithFormat:@"%@ — %@", NSLocalizedString(@"Magnetized transfer", "Torrent -> progress string"), progressString];
+        return [NSString stringWithFormat:@"%@ — %@", NSLocalizedString(@"Magnetized torrent", "Torrent -> progress string"), progressString];
     }
 
     NSString* string;
@@ -1180,15 +1177,14 @@ static tr_torrent_rename_done_func makeRenameDoneCallback(NSDictionary* contextI
     //append even if error
     if (self.active && !self.checking) {
         if (self.fStat.activity == TR_STATUS_DOWNLOAD) {
-            string = [string stringByAppendingFormat:@" — %@: %@, %@: %@",
-                                                     NSLocalizedString(@"DL", "Torrent -> status string"),
-                                                     [NSString stringForSpeed:self.downloadRate],
-                                                     NSLocalizedString(@"UL", "Torrent -> status string"),
-                                                     [NSString stringForSpeed:self.uploadRate]];
+            string = [string stringByAppendingFormat:@" — %@",
+                                                     [NSString stringWithFormat:NSLocalizedString(@"Down: %@, Up: %@", "Torrent -> status string"),
+                                                                                [NSString stringForSpeed:self.downloadRate],
+                                                                                [NSString stringForSpeed:self.uploadRate]]];
         } else {
-            string = [string stringByAppendingFormat:@" — %@: %@",
-                                                     NSLocalizedString(@"UL", "Torrent -> status string"),
-                                                     [NSString stringForSpeed:self.uploadRate]];
+            string = [string stringByAppendingFormat:@" — %@",
+                                                     [NSString stringWithFormat:NSLocalizedString(@"Up: %@", "Torrent -> status string"),
+                                                                                [NSString stringForSpeed:self.uploadRate]]];
         }
     }
 
@@ -1227,18 +1223,14 @@ static tr_torrent_rename_done_func makeRenameDoneCallback(NSDictionary* contextI
         break;
 
     case TR_STATUS_DOWNLOAD:
-        string = [NSString stringWithFormat:@"%@: %@, %@: %@",
-                                            NSLocalizedString(@"DL", "Torrent -> status string"),
+        string = [NSString stringWithFormat:NSLocalizedString(@"Down: %@, Up: %@", "Torrent -> status string"),
                                             [NSString stringForSpeed:self.downloadRate],
-                                            NSLocalizedString(@"UL", "Torrent -> status string"),
                                             [NSString stringForSpeed:self.uploadRate]];
         break;
 
     case TR_STATUS_SEED:
-        string = [NSString stringWithFormat:@"%@: %@, %@: %@",
-                                            NSLocalizedString(@"Ratio", "Torrent -> status string"),
+        string = [NSString stringWithFormat:NSLocalizedString(@"Ratio: %@, Up: %@", "Torrent -> status string"),
                                             [NSString stringForRatio:self.ratio],
-                                            NSLocalizedString(@"UL", "Torrent -> status string"),
                                             [NSString stringForSpeed:self.uploadRate]];
     }
 

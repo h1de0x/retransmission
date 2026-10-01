@@ -614,7 +614,7 @@
           <item row="2" column="0" colspan="3">
            <widget class="QCheckBox" name="autoUpdateBlocklistCheck">
             <property name="text">
-             <string>Enable &amp;automatic updates</string>
+             <string>&amp;Automatically update weekly</string>
             </property>
            </widget>
           </item>
@@ -651,7 +651,7 @@
        <item>
         <widget class="QGroupBox" name="incomingPeersSection">
          <property name="title">
-          <string>Incoming Peers</string>
+          <string>Listening Port</string>
          </property>
          <layout class="QGridLayout" name="incomingPeersSectionLayout" columnstretch="0,1,0">
           <item row="0" column="0">
@@ -717,7 +717,7 @@
           <item row="0" column="0">
            <widget class="QLabel" name="torrentPeerLimitLabel">
             <property name="text">
-             <string>Maximum peers per &amp;torrent:</string>
+             <string>Maximum peers for new &amp;torrents:</string>
             </property>
             <property name="buddy">
              <cstring>torrentPeerLimitSpin</cstring>
@@ -785,7 +785,7 @@
              <string>PEX is a tool for exchanging peer lists with the peers you're connected to.</string>
             </property>
             <property name="text">
-             <string>Use PE&amp;X to find more peers</string>
+             <string>Use PE&amp;X to find more peers for public torrents</string>
             </property>
            </widget>
           </item>
@@ -795,7 +795,7 @@
              <string>DHT is a tool for finding peers without a tracker.</string>
             </property>
             <property name="text">
-             <string>Use &amp;DHT to find more peers</string>
+             <string>Use &amp;DHT to find more peers for public torrents</string>
             </property>
            </widget>
           </item>
@@ -805,7 +805,7 @@
              <string>LPD is a tool for finding peers on your local network.</string>
             </property>
             <property name="text">
-             <string>Use &amp;Local Peer Discovery to find more peers</string>
+             <string>Use &amp;Local Peer Discovery to find more peers for public torrents</string>
             </property>
            </widget>
           </item>
@@ -883,7 +883,7 @@ To add a new primary URL, add it after a blank line.</string>
           <item>
            <widget class="QCheckBox" name="preventSleepCheck">
             <property name="text">
-             <string>&amp;Prevent computer from sleeping with active transfers</string>
+             <string>&amp;Prevent computer from sleeping with active torrents</string>
             </property>
            </widget>
           </item>

@@ -184,7 +184,7 @@ MainWindow::MainWindow(Session& session, Prefs& prefs, TorrentModel& model, bool
     connect(action_group, &QActionGroup::triggered, this, &MainWindow::onSortModeChanged);
 
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-    alt_speed_action_ = new QAction{ tr("Speed Limits"), this };
+    alt_speed_action_ = new QAction{ tr("Alternative Speed &Limits"), this };
     alt_speed_action_->setIcon(ui_.altSpeedButton->icon());
     alt_speed_action_->setCheckable(true);
     connect(alt_speed_action_, &QAction::triggered, this, &MainWindow::toggleSpeedMode);
@@ -1309,9 +1309,8 @@ void MainWindow::removeTorrents(bool const delete_files)
     }
 
     if (incomplete == 0 && connected == 0) {
-        secondary_text = count == 1 ?
-            tr("Once removed, continuing the transfer will require the torrent file or magnet link.") :
-            tr("Once removed, continuing the transfers will require the torrent files or magnet links.");
+        secondary_text = count == 1 ? tr("Once removed, you'll need the torrent file or magnet link to add it again.") :
+                                      tr("Once removed, you'll need the torrent files or magnet links to add them again.");
     } else if (count == incomplete) {
         secondary_text = count == 1 ? tr("This torrent has not finished downloading.") :
                                       tr("These torrents have not finished downloading.");
