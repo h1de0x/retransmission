@@ -23,7 +23,9 @@
 #include <array>
 #include <cmath>
 #include <cstddef> // size_t
+#include <cstdint>
 #include <functional> // std::hash
+#include <string>
 #include <utility>
 
 using namespace std::string_view_literals;
@@ -193,6 +195,28 @@ public:
     [[nodiscard]] Glib::ustring get_long_status_text() const;
     [[nodiscard]] std::vector<Glib::ustring> get_css_classes() const;
 
+    [[nodiscard]] bool has_search_text() const noexcept
+    {
+        return has_search_text_;
+    }
+
+    [[nodiscard]] std::string const& get_search_text() const noexcept
+    {
+        return search_text_;
+    }
+
+    [[nodiscard]] uint64_t get_search_text_revision() const noexcept
+    {
+        return search_text_revision_;
+    }
+
+    void set_search_text(std::string&& text, uint64_t const edit_revision)
+    {
+        search_text_ = std::move(text);
+        search_text_revision_ = edit_revision;
+        has_search_text_ = true;
+    }
+
     static void class_init(void* cls, void* user_data);
 
 private:
@@ -205,6 +229,10 @@ private:
     tr_torrent* const raw_torrent_;
 
     Cache cache_;
+
+    std::string search_text_;
+    uint64_t search_text_revision_ = {};
+    bool has_search_text_ = false;
 };
 
 Torrent::Impl::Impl(Torrent& torrent, tr_torrent* raw_torrent)
@@ -847,6 +875,26 @@ bool Torrent::get_sensitive() const
 std::vector<Glib::ustring> Torrent::get_css_classes() const
 {
     return impl_->get_css_classes();
+}
+
+bool Torrent::has_search_text() const noexcept
+{
+    return impl_->has_search_text();
+}
+
+std::string const& Torrent::get_search_text() const noexcept
+{
+    return impl_->get_search_text();
+}
+
+uint64_t Torrent::get_search_text_revision() const noexcept
+{
+    return impl_->get_search_text_revision();
+}
+
+void Torrent::set_search_text(std::string&& text, uint64_t const edit_revision)
+{
+    impl_->set_search_text(std::move(text), edit_revision);
 }
 
 Torrent::ChangeFlags Torrent::update()

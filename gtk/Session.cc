@@ -9,6 +9,7 @@
 #include "PrefsDialog.h"
 #include "SortListModel.hh"
 #include "Torrent.h"
+#include "TorrentSearchIndex.h"
 #include "TorrentSorter.h"
 #include "Utils.h"
 
@@ -86,6 +87,8 @@ public:
 
     void update();
     void torrents_added();
+
+    void enable_search_index();
 
     void add_files(std::vector<Glib::RefPtr<Gio::File>> const& files, bool do_start, bool do_prompt, bool do_notify);
     void add_builder(std::unique_ptr<tr_torrent_builder> builder, bool do_prompt, bool do_notify);
@@ -200,6 +203,9 @@ private:
     tr_session* session_ = nullptr;
 
     FaviconCache<Glib::RefPtr<Gdk::Pixbuf>> favicon_cache_;
+
+    // Declared last so its worker stops before the members its callbacks use.
+    TorrentSearchIndex search_index_;
 };
 
 Glib::RefPtr<Session> Session::Impl::get_core_ptr() const
@@ -501,6 +507,11 @@ Session::~Session() = default;
 Session::Impl::Impl(Session& core, tr_session* session)
     : core_{ core }
     , session_{ session }
+    , search_index_{ session,
+                     [this](tr_torrent_id_t const torrent_id) { return find_torrent_by_id(torrent_id).first; },
+                     [this](std::unordered_set<tr_torrent_id_t> const& torrent_ids) {
+                         signal_torrents_changed_.emit(torrent_ids, Torrent::ChangeFlag::SEARCH_TEXT);
+                     } }
 {
     raw_model_ = Gio::ListStore<Torrent>::create();
     signal_torrents_changed_.connect(sigc::hide<0>(sigc::mem_fun(*sorter_, &TorrentSorter::update)));
@@ -535,6 +546,9 @@ tr_session* Session::close()
 
 tr_session* Session::Impl::close()
 {
+    // Stop snapshot requests before the caller passes this session to tr_sessionClose().
+    search_index_.shutdown();
+
     auto* session = session_;
 
     if (session != nullptr) {
@@ -909,6 +923,26 @@ void Session::update()
     impl_->update();
 }
 
+void Session::enable_search_index()
+{
+    impl_->enable_search_index();
+}
+
+void Session::Impl::enable_search_index()
+{
+    if (search_index_.is_enabled()) {
+        return;
+    }
+
+    auto torrents = std::vector<Glib::RefPtr<Torrent>>{};
+    torrents.reserve(raw_model_->get_n_items());
+    for (auto i = 0U, count = raw_model_->get_n_items(); i < count; ++i) {
+        torrents.emplace_back(raw_model_->get_item(i));
+    }
+
+    search_index_.enable(torrents);
+}
+
 void Session::start_now(tr_torrent_id_t const id)
 {
     auto params = tr_variant::Map{ 1U };
@@ -928,7 +962,12 @@ void Session::Impl::update()
             torrent_ids.insert(torrent->get_id());
             changes |= torrent_changes;
         }
+
+        // Revision checks also catch renames and newly arrived metadata.
+        search_index_.check(*torrent.get());
     }
+
+    search_index_.kick();
 
     update_sleep_inhibitor();
 

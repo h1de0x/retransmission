@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <ranges>
+#include <string>
 #include <utility>
 
 TorrentFilter::TorrentFilter()
@@ -134,7 +135,8 @@ void TorrentFilter::update(Torrent::ChangeFlags changes)
     }
 
     if (!refilter_needed) {
-        refilter_needed = !text_.empty() && changes.test(Flag::NAME);
+        // Name changes reach the filter as SEARCH_TEXT after the index is rebuilt.
+        refilter_needed = !text_.empty() && changes.test(Flag::SEARCH_TEXT);
     }
 
     if (refilter_needed) {
@@ -206,21 +208,15 @@ bool TorrentFilter::match_tracker(Torrent const& torrent, Tracker type, Glib::us
 
 bool TorrentFilter::match_text(Torrent const& torrent, Glib::ustring const& text)
 {
-    bool ret = false;
-
     if (text.empty()) {
-        ret = true;
-    } else {
-        auto const& raw_torrent = torrent.get_underlying();
-
-        /* test the torrent name... */
-        ret = torrent.get_name().casefold().find(text) != Glib::ustring::npos;
-
-        /* test the files... */
-        for (auto i = size_t{ 0 }, n = tr_torrentFileCount(&raw_torrent); i < n && !ret; ++i) {
-            ret = Glib::ustring(tr_torrentFile(&raw_torrent, i).name).casefold().find(text) != Glib::ustring::npos;
-        }
+        return true;
     }
 
-    return ret;
+    // Missing search text is unknown, not a negative match.
+    if (!torrent.has_search_text()) {
+        return true;
+    }
+
+    // `text` is case-folded by set_text(), and so is the indexed search text.
+    return torrent.get_search_text().find(text.raw()) != std::string::npos;
 }

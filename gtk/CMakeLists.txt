@@ -71,6 +71,8 @@ target_sources(${TR_NAME}-gtk-lib
         TorrentCellRenderer.h
         TorrentFilter.cc
         TorrentFilter.h
+        TorrentSearchIndex.cc
+        TorrentSearchIndex.h
         TorrentSorter.cc
         TorrentSorter.h
         Transports.h

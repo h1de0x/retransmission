@@ -125,6 +125,9 @@ public:
     /* update the model with current torrent status */
     void update();
 
+    // Lazily starts building the text-search index.
+    void enable_search_index();
+
     /**
      * Attempts to start a torrent immediately.
      */

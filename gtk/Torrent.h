@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 class Percents;
 
@@ -60,6 +61,7 @@ public:
         QUEUE_POSITION,
         RATIO,
         RECHECK_PROGRESS,
+        SEARCH_TEXT, // Set by Session when the search index publishes new text.
         SEED_RATIO_PERCENT_DONE,
         SPEED_DOWN,
         SPEED_UP,
@@ -113,6 +115,13 @@ public:
     Glib::ustring get_long_status_text() const;
     bool get_sensitive() const;
     std::vector<Glib::ustring> get_css_classes() const;
+
+    // Case-folded torrent name and file subpaths, separated by NULs.
+    // Missing text means no indexed snapshot has been published yet.
+    [[nodiscard]] bool has_search_text() const noexcept;
+    [[nodiscard]] std::string const& get_search_text() const noexcept;
+    [[nodiscard]] uint64_t get_search_text_revision() const noexcept;
+    void set_search_text(std::string&& text, uint64_t edit_revision);
 
     ChangeFlags update();
 

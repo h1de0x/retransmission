@@ -523,7 +523,15 @@ void FilterBar::Impl::show_mode_combo_box_init(Gtk::ComboBox& combo)
 
 void FilterBar::Impl::update_filter_text()
 {
-    filter_->set_text(entry_->get_text());
+    auto const text = entry_->get_text();
+
+    // Build the index only after the first text search.
+    // Users who never search don't pay its startup or memory cost.
+    if (!text.empty()) {
+        core_->enable_search_index();
+    }
+
+    filter_->set_text(text);
 }
 
 void FilterBar::Impl::update_filter_show_mode()
