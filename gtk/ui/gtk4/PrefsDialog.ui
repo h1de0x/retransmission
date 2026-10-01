@@ -311,7 +311,7 @@
                             </child>
                             <child>
                               <object class="GtkCheckButton" id="trash_on_add_check">
-                                <property name="label" translatable="yes">Mo_ve torrent file to the trash</property>
+                                <property name="label" translatable="yes">Mo_ve torrent file to the Trash</property>
                                 <property name="focusable">1</property>
                                 <property name="valign">center</property>
                                 <property name="hexpand">1</property>
@@ -325,7 +325,7 @@
                             </child>
                             <child>
                               <object class="GtkLabel" id="download_dir_label">
-                                <property name="label" translatable="yes">Save to _Location:</property>
+                                <property name="label" translatable="yes">Save to _location:</property>
                                 <property name="use-underline">1</property>
                                 <property name="mnemonic-widget">download_dir_chooser</property>
                                 <property name="xalign">0</property>
@@ -474,7 +474,7 @@
                             </child>
                             <child>
                               <object class="GtkCheckButton" id="incomplete_dir_check">
-                                <property name="label" translatable="yes">Keep _incomplete torrents in:</property>
+                                <property name="label" translatable="yes">Keep _incomplete files in:</property>
                                 <property name="focusable">1</property>
                                 <property name="valign">center</property>
                                 <property name="use-underline">1</property>
@@ -823,7 +823,7 @@
                             <property name="column-spacing">12</property>
                             <child>
                               <object class="GtkLabel" id="listening_port_label">
-                                <property name="label" translatable="yes">_Port used for incoming connections:</property>
+                                <property name="label" translatable="yes">_Port for incoming connections:</property>
                                 <property name="use-underline">1</property>
                                 <property name="mnemonic-widget">listening_port_spin</property>
                                 <property name="xalign">0</property>
@@ -835,7 +835,7 @@
                             </child>
                             <child>
                               <object class="GtkCheckButton" id="pick_random_listening_port_at_start_check">
-                                <property name="label" translatable="yes">Pick a _random port every time Transmission is started</property>
+                                <property name="label" translatable="yes">Pick a _random port at startup</property>
                                 <property name="focusable">1</property>
                                 <property name="valign">center</property>
                                 <property name="hexpand">1</property>
@@ -995,7 +995,7 @@
                             <property name="column-spacing">12</property>
                             <child>
                               <object class="GtkCheckButton" id="enable_utp_check">
-                                <property name="label" translatable="yes">Enable µ_TP for peer communication</property>
+                                <property name="label" translatable="yes">Enable µ_TP for peer connections</property>
                                 <property name="focusable">1</property>
                                 <property name="tooltip-text" translatable="yes">µTP is a tool for reducing network congestion.</property>
                                 <property name="valign">center</property>
@@ -1271,7 +1271,7 @@ To add a new primary URL, add it after a blank line.]]></property>
                                 <child>
                                   <object class="GtkButton" id="open_web_client_button">
                                     <property name="sensitive" bind-source="enable_rpc_check" bind-property="active" bind-flags="sync-create">0</property>
-                                    <property name="label" translatable="yes">_Open web client</property>
+                                    <property name="label" translatable="yes">_Open Web Client</property>
                                     <property name="focusable">1</property>
                                     <property name="receives-default">1</property>
                                     <property name="use-underline">1</property>
