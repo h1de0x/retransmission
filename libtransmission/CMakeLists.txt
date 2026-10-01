@@ -163,6 +163,7 @@ target_sources(${TR_NAME}
         torrent-magnet.h
         torrent-metainfo.cc
         torrent-metainfo.h
+        torrent-path-snapshot.h
         torrent-queue.cc
         torrent-queue.h
         torrent.cc

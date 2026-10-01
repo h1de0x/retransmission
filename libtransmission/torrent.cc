@@ -42,6 +42,7 @@
 #include "libtransmission/torrent-builder.h"
 #include "libtransmission/torrent-magnet.h"
 #include "libtransmission/torrent-metainfo.h"
+#include "libtransmission/torrent-path-snapshot.h"
 #include "libtransmission/torrent.h"
 #include "libtransmission/tr-assert.h"
 #include "libtransmission/tr-strbuf.h"
@@ -155,6 +156,12 @@ tr_torrent_id_t tr_torrentId(tr_torrent const* tor)
     return tor != nullptr ? tor->id() : -1;
 }
 
+uint64_t tr_torrentEditRevision(tr_torrent const* tor)
+{
+    TR_ASSERT(tr_isTorrent(tor));
+    return tor->edit_revision();
+}
+
 tr_torrent* tr_torrentFindFromId(tr_session* session, tr_torrent_id_t id)
 {
     return session != nullptr ? session->torrents().get(id) : nullptr;
@@ -194,6 +201,92 @@ bool tr_torrentSetMetainfoFromFile(tr_torrent* tor, tr_torrent_metainfo const* m
     }
 
     return true;
+}
+
+// ---
+
+namespace
+{
+namespace path_snapshot_helpers
+{
+[[nodiscard]] tr_torrent_path_snapshot make_snapshot(tr_torrent const& tor)
+{
+    auto snapshot = tr_torrent_path_snapshot{};
+    snapshot.id = tor.id();
+    snapshot.edit_revision = tor.edit_revision();
+    snapshot.name = tor.name();
+
+    auto const n_files = tor.file_count();
+    snapshot.file_subpaths.reserve(n_files);
+    for (tr_file_index_t i = 0; i < n_files; ++i) {
+        snapshot.file_subpaths.emplace_back(tor.file_subpath(i));
+    }
+
+    return snapshot;
+}
+
+[[nodiscard]] tr_torrent_path_snapshot_batch make_batch(
+    tr_torrents const& torrents,
+    std::span<tr_torrent_id_t const> const ids,
+    size_t const max_files)
+{
+    auto batch = tr_torrent_path_snapshot_batch{};
+    auto n_files = size_t{};
+
+    for (auto const id : ids) {
+        auto const* const tor = torrents.get(id);
+        if (tor == nullptr) {
+            ++batch.ids_processed;
+            continue;
+        }
+
+        auto const tor_files = tor->file_count();
+        // This is n_files + tor_files > max_files without overflow.
+        // n_files may already exceed max_files after an oversized first torrent.
+        if (!std::empty(batch.snapshots) && (n_files > max_files || tor_files > max_files - n_files)) {
+            break;
+        }
+
+        batch.snapshots.emplace_back(make_snapshot(*tor));
+        n_files += tor_files;
+        ++batch.ids_processed;
+    }
+
+    return batch;
+}
+} // namespace path_snapshot_helpers
+} // namespace
+
+void tr_sessionRequestTorrentPathSnapshots(
+    tr_session* const session,
+    std::span<tr_torrent_id_t const> const ids,
+    size_t const max_torrents,
+    size_t const max_files,
+    tr_torrent_path_snapshot_func callback)
+{
+    tr_return_if_fail(session != nullptr);
+    tr_return_if_fail(callback);
+
+    TR_ASSERT(!session->am_in_session_thread());
+
+    auto const effective_max_torrents = std::max(max_torrents, size_t{ 1U });
+    auto const n_ids_to_copy = std::min(ids.size(), effective_max_torrents);
+    auto const ids_to_copy = ids.first(n_ids_to_copy);
+    auto owned_ids = std::vector<tr_torrent_id_t>{ ids_to_copy.begin(), ids_to_copy.end() };
+
+    session->queue_session_thread([session, owned_ids = std::move(owned_ids), max_files, callback = std::move(callback)]() {
+        using namespace path_snapshot_helpers;
+
+        auto batch = tr_torrent_path_snapshot_batch{};
+
+        {
+            // tr_torrentNew() adds to torrents() from other threads while holding this lock.
+            auto const lock = session->unique_lock();
+            batch = make_batch(session->torrents(), owned_ids, max_files);
+        }
+
+        callback(std::move(batch));
+    });
 }
 
 // ---
@@ -2740,6 +2833,8 @@ void tr_torrent::mark_edited()
     auto const now = tr_time();
     bump_date_edited(now);
     bump_date_changed(now);
+    // Relaxed: readers use the revision only to detect a change, not to read the edited data.
+    edit_revision_.fetch_add(1U, std::memory_order_relaxed);
 }
 
 void tr_torrent::mark_changed()

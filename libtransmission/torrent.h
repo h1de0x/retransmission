@@ -10,6 +10,7 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef> // size_t
 #include <cstdint> // uint64_t, uint16_t
 #include <ctime>
@@ -896,6 +897,11 @@ struct tr_torrent {
         return date_changed_ > when;
     }
 
+    [[nodiscard]] auto edit_revision() const noexcept
+    {
+        return edit_revision_.load(std::memory_order_relaxed);
+    }
+
     void set_bandwidth_group(std::string_view group_name);
 
     [[nodiscard]] constexpr auto get_priority() const noexcept
@@ -1486,6 +1492,8 @@ private:
     time_t date_done_ = 0;
     time_t date_edited_ = 0;
     time_t date_started_ = 0;
+
+    std::atomic<uint64_t> edit_revision_ = 0U;
 
     time_t seconds_downloading_before_current_start_ = 0;
     time_t seconds_seeding_before_current_start_ = 0;
